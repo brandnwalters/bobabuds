@@ -1,0 +1,31 @@
+# dependencies
+node_modules/
+
+# Next.js / build output
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# env files (commit only .env.example)
+.env
+.env*.local
+.env.*
+!.env.example
+
+# test output
+coverage/
+playwright-report/
+test-results/
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+
+# Claude Code worktrees
+.claude/worktrees/
+
+# editor / OS
+.DS_Store
+.vercel/
