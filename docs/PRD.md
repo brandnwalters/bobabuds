@@ -1,6 +1,6 @@
 # BobaBuds — Product Requirements
 
-Status: agreed 2026-10-20. This file records decisions; change it only when a decision changes. Items marked *(default — confirm)* are defaults the owner hasn't explicitly chosen yet.
+Status: agreed 2026-10-20. This file records decisions; change it only when a decision changes. Items marked are defaults the owner hasn't explicitly chosen yet.
 
 ## What it is
 
@@ -11,10 +11,10 @@ It is a portfolio project, built so it can grow into a real product or a friends
 ## Users and social model
 
 - Public profiles, one-way follows (Letterboxd model).
-- Each account has a unique `@username`: 3–20 characters, lowercase letters, digits, and underscores, unique ignoring case, with a small reserved list (`admin`, `explore`, `settings`, `api`, …). *(default — confirm)*
-- Logged-out visitors can view profiles, logs, and shop pages but can't log, follow, or report. *(default — confirm)*
+- Each account has a unique `@username`: 3–20 characters, lowercase letters, digits, and underscores, unique ignoring case, with a small reserved list (`admin`, `explore`, `settings`, `api`, …).
+- Logged-out visitors can view profiles, logs, and shop pages but can't log, follow, or report.
 - Sign-in: Google OAuth and email magic link (Supabase Auth). No passwords.
-- Avatar: the Google profile picture if there is one, otherwise initials. No avatar uploads in v1. *(default — confirm)*
+- Avatar: the Google profile picture if there is one, otherwise initials. No avatar uploads in v1.
 
 ## Core action: log a drink
 
@@ -41,7 +41,7 @@ Any drink a typical boba shop sells, or that appears on an Asian restaurant's dr
 
 Shop search uses Google Places and covers bubble tea shops, cafes, and Asian restaurants, with bubble tea shops ranked first.
 
-Because the app never reads the user's location, search needs an area to be useful for chains ("Gong Cha" alone matches the whole world). The search has an optional "near" field (city or neighborhood), prefilled from the request's approximate IP region (Vercel geo headers). The region is used only for that request and never stored. Browser geolocation is never used. *(default — confirm)*
+Because the app never reads the user's location, search needs an area to be useful for chains ("Gong Cha" alone matches the whole world). The search has an optional "near" field (city or neighborhood), prefilled from the request's approximate IP region (Vercel geo headers). The region is used only for that request and never stored. Browser geolocation is never used.
 
 ## Shops, chains, and shop drinks
 
