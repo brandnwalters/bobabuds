@@ -11,7 +11,7 @@ Commands are added by the scaffold (roadmap item 1). Update this section when th
 ## Hard rules
 
 - **No price data** anywhere: no columns, fields, or UI.
-- **Never expose time of day** publicly. Timestamp columns are hidden with column grants; feeds sort server-side in Postgres functions; views use `security_invoker = true`; ids are UUIDv4. Show `drank_on` only.
+- **Never expose time of day** publicly. Timestamp columns are hidden with column grants; feeds sort server-side in `security definer` Postgres functions that re-apply visibility rules; queries name columns, never `select('*')`; views use `security_invoker = true`; ids are UUIDv4. Show `drank_on` only.
 - **Strip photo metadata.** Photos are re-encoded on the client before upload, which removes EXIF (GPS and capture time).
 - **Never collect user GPS.** Location comes only from the chosen shop.
 - **RLS is the security boundary.** Every table has RLS enabled with policies tested in pgTAP. UI checks are convenience only.

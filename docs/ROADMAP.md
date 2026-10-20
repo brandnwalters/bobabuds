@@ -33,7 +33,8 @@ First, check Google's current Places caching and attribution terms and record in
 - self-follows are rejected; usernames are unique ignoring case and must match the format;
 - shop drink names are unique per shop by normalized name, and a log's shop drink must belong to its shop;
 - a user can write photos only under their own storage path, the bucket rejects non-images and oversize files, and listing is denied;
-- views run with `security_invoker`.
+- views run with `security_invoker`;
+- `security definer` functions return only rows the caller could otherwise see.
 
 ## 4. Auth and onboarding
 
@@ -49,7 +50,7 @@ A `PlacesClient` interface, a Google implementation, and a fake for tests. Searc
 
 🔑 Google Cloud project with billing + Places API key, for manual checks against the real API; tests use the fake.
 
-**Done when:** unit tests cover ranking, the "near" bias, and the upsert; a Playwright test (fake client) searches and selects a shop location; nothing on the request path stores the IP region.
+**Done when:** unit tests cover ranking, the "near" bias, and the upsert; a Playwright test (fake client) searches and selects a shop location; no table has an IP or region column.
 
 ## 5b. Skeleton deploy
 
@@ -78,7 +79,7 @@ Logs list plus the stats defined in the PRD.
 
 Follow and unfollow, Following and Explore feeds (newest first by post time, paginated, served by functions that never return timestamps), `@username` search.
 
-**Done when:** a Playwright test with two users: B follows A, A logs a drink, it appears first in B's Following feed and in Explore; after unfollowing, it leaves B's Following feed; a backdated log still appears at the top when posted; feed responses contain no timestamps.
+**Done when:** a Playwright test with two users: B starts on Explore, follows A, and now lands on Following; A logs a drink, it appears first in B's Following feed and in Explore; after unfollowing, it leaves B's Following feed; a backdated log still appears at the top when posted; feed responses contain no timestamps.
 
 ## 9. Shop location page
 

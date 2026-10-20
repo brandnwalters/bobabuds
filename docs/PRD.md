@@ -56,7 +56,8 @@ Timestamps and location are the two things a public drink log can leak. The rule
 
 - **No time of day is ever exposed.** Only `drank_on` (a date) is public.
   - Every timestamp column (`logs.created_at`, `follows.created_at`, `reports.*`, any `updated_at`) is hidden from the `anon` and `authenticated` roles with column grants: revoke table-level `select`, then grant `select` on the public columns only.
-  - Anything that needs to sort by a hidden timestamp (feeds) goes through Postgres functions that sort internally and return only public columns.
+  - Anything that needs to sort by a hidden timestamp (feeds, "most recent" tie-breaks in stats) goes through Postgres functions that sort internally and return only public columns. These functions are `security definer` with `set search_path = ''`, so they bypass RLS and must re-apply the visibility rules themselves; pgTAP tests show they return only rows the caller could otherwise see.
+  - Generated Supabase types still list hidden columns, so app queries name their columns explicitly instead of using `select('*')`.
   - Views in `public` must use `security_invoker = true`, or they bypass RLS.
   - Ids are random UUIDv4, never UUIDv7 or other time-ordered ids.
 - **No user GPS.** Location comes only from the shop the user picks.
@@ -127,7 +128,7 @@ Names are a starting point; roadmap item 3 settles them under test. All ids are 
 - `profiles` (id = auth user id, username unique on `lower(username)`, display_name, bio)
 - `brands` (id, name)
 - `shops` (id, google_place_id unique, brand_id null, plus whatever Places fields the terms allow us to store)
-- `shop_drinks` (id, shop_id, name, normalized_name; unique on shop_id + normalized_name)
+- `shop_drinks` (id, shop_id, name, normalized_name; unique on shop_id + normalized_name; unique on id + shop_id for the logs composite foreign key)
 - `toppings` (id, name) seeded
 - `logs` (id, user_id, shop_id, shop_drink_id, rating, category, sugar, ice, note, drank_on date, photo_path, created_at). A composite foreign key `(shop_drink_id, shop_id)` keeps the drink and shop consistent.
 - `log_toppings` (id, log_id, topping_id null, custom_name null; exactly one of topping_id / custom_name set)
