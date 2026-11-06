@@ -5,6 +5,7 @@ import { Suspense } from "react";
 
 import { LogForm } from "@/components/logs/log-form";
 import { getLog, getViewerId } from "@/lib/logs/queries";
+import { getLogSuggestions } from "@/lib/logs/suggestions";
 
 export const metadata: Metadata = { title: "Edit Log · Boba Buds" };
 
@@ -27,8 +28,12 @@ async function EditLogForm({
   const { id } = await params;
   // Per-request: the Supabase session check reads the clock.
   await connection();
-  const [log, viewerId] = await Promise.all([getLog(id), getViewerId()]);
+  const [log, viewerId, suggestions] = await Promise.all([
+    getLog(id),
+    getViewerId(),
+    getLogSuggestions(),
+  ]);
   // Only the author edits; to anyone else this page doesn't exist.
   if (!log || log.authorId !== viewerId) notFound();
-  return <LogForm log={log} />;
+  return <LogForm log={log} suggestions={suggestions} />;
 }

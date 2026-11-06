@@ -33,7 +33,7 @@ test("the author edits a Log's rating and then deletes it", async ({ page }) => 
   // The form starts with the Log's current values. (Role queries skip the
   // hidden /log form that Next keeps alive from the previous page.)
   await expect(page.getByTestId("chosen-shop").filter({ visible: true })).toContainText("Cha House");
-  await expect(page.getByRole("textbox", { name: "Drink" })).toHaveValue(drink);
+  await expect(page.getByRole("combobox", { name: "Drink" })).toHaveValue(drink);
   await expect(page.getByRole("radio", { name: "3 stars", exact: true }))
     .toBeChecked();
   await expect(page.getByLabel("Date").filter({ visible: true }))
@@ -117,7 +117,7 @@ test("only the author gets Edit and Delete, and the edit page", async ({
     await stranger.goto(url);
     await expect(stranger.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(stranger.getByRole("heading", { name: "Edit Log" })).toHaveCount(0);
-    await expect(stranger.getByRole("textbox", { name: "Drink" })).toHaveCount(0);
+    await expect(stranger.getByRole("combobox", { name: "Drink" })).toHaveCount(0);
     await expect(stranger.getByRole("link", { name: "Edit" })).toHaveCount(0);
     await expect(stranger.getByRole("button", { name: "Delete" })).toHaveCount(0);
   }

@@ -3,6 +3,7 @@
 import { Plus, X } from "lucide-react";
 import { useActionState, useId, useState, useSyncExternalStore } from "react";
 
+import { DrinkNameInput } from "@/components/logs/drink-name-input";
 import { ShopPicker } from "@/components/logs/shop-picker";
 import { StarRatingInput } from "@/components/logs/star-rating-input";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
   type LogField,
 } from "@/lib/logs/fields";
 import type { LogWithShop } from "@/lib/logs/queries";
+import type { LogSuggestions } from "@/lib/logs/suggestions";
 import type { ShopDetails } from "@/lib/places/types";
 import { cn } from "@/lib/utils";
 
@@ -42,9 +44,16 @@ function useToday() {
 /**
  * The single-screen Log form, in spec order: shop, drink, rating, date, then
  * the optional extras. Without `log` it creates a Log; with `log` it starts
- * from that Log's values and saves over it.
+ * from that Log's values and saves over it. `suggestions` (recent shops and
+ * drink names from the user's own Logs) power the shop and drink shortcuts.
  */
-export function LogForm({ log }: { log?: LogWithShop }) {
+export function LogForm({
+  log,
+  suggestions = { recentShops: [], drinksByPlaceId: {} },
+}: {
+  log?: LogWithShop;
+  suggestions?: LogSuggestions;
+}) {
   const [state, formAction, pending] = useActionState(
     log ? updateLog.bind(null, log.id) : createLog,
     initialState,
@@ -62,6 +71,8 @@ export function LogForm({ log }: { log?: LogWithShop }) {
   const [toppings, setToppings] = useState<string[]>(log?.toppings ?? []);
   const [customTopping, setCustomTopping] = useState("");
   const [note, setNote] = useState(log?.note ?? "");
+  const { recentShops, drinksByPlaceId } = suggestions;
+  const drinkSuggestions = (shop && drinksByPlaceId[shop.placeId]) || [];
 
   const errorProps = (field: LogField) =>
     errors[field]
@@ -97,6 +108,7 @@ export function LogForm({ log }: { log?: LogWithShop }) {
           id={`${formId}-shop`}
           value={shop}
           onChange={setShop}
+          recentShops={recentShops}
           invalid={!!errors.shop && !shop}
           describedBy={errors.shop ? `${formId}-shop-error` : undefined}
         />
@@ -106,14 +118,14 @@ export function LogForm({ log }: { log?: LogWithShop }) {
 
       <div className="space-y-2">
         <Label htmlFor={`${formId}-drinkName`}>Drink</Label>
-        <Input
+        <DrinkNameInput
           id={`${formId}-drinkName`}
           name="drinkName"
           value={drinkName}
-          onChange={(event) => setDrinkName(event.target.value)}
+          onChange={setDrinkName}
+          suggestions={drinkSuggestions}
           maxLength={DRINK_NAME_MAX}
           placeholder="e.g. Brown sugar milk tea"
-          autoComplete="off"
           {...errorProps("drinkName")}
         />
         <FieldError formId={formId} field="drinkName" errors={errors} />
