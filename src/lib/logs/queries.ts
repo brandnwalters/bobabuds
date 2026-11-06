@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { IceLevel } from "@/lib/logs/fields";
+import type { ShopDetails } from "@/lib/places/types";
 import { createClient } from "@/lib/supabase/server";
 
 export type LogWithShop = {
@@ -14,16 +15,11 @@ export type LogWithShop = {
   toppings: string[];
   note: string | null;
   createdAt: string;
-  shop: {
-    id: string;
-    name: string;
-    formattedAddress: string;
-    googleMapsUrl: string;
-  };
+  shop: ShopDetails & { id: string };
 };
 
 const LOG_COLUMNS =
-  "id, author_id, drink_name, rating, drank_on, sweetness, ice, toppings, note, created_at, shop:shops!inner(id, name, formatted_address, google_maps_url)";
+  "id, author_id, drink_name, rating, drank_on, sweetness, ice, toppings, note, created_at, shop:shops!inner(id, place_id, name, formatted_address, latitude, longitude, google_maps_url)";
 
 type LogRow = {
   id: string;
@@ -38,8 +34,11 @@ type LogRow = {
   created_at: string;
   shop: {
     id: string;
+    place_id: string;
     name: string;
     formatted_address: string;
+    latitude: number;
+    longitude: number;
     google_maps_url: string;
   };
 };
@@ -58,8 +57,11 @@ function toLog(row: LogRow): LogWithShop {
     createdAt: row.created_at,
     shop: {
       id: row.shop.id,
+      placeId: row.shop.place_id,
       name: row.shop.name,
       formattedAddress: row.shop.formatted_address,
+      latitude: row.shop.latitude,
+      longitude: row.shop.longitude,
       googleMapsUrl: row.shop.google_maps_url,
     },
   };
@@ -78,6 +80,12 @@ export async function getLog(id: string): Promise<LogWithShop | null> {
     .maybeSingle<LogRow>();
   if (error) throw error;
   return data ? toLog(data) : null;
+}
+
+/** The signed-in user's id, or null when signed out. */
+export async function getViewerId(): Promise<string | null> {
+  const supabase = await createClient();
+  return (await supabase.auth.getClaims()).data?.claims.sub ?? null;
 }
 
 /** The signed-in user's own Logs, newest drink first. */
