@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
+import { CheeredBy } from "@/components/cheers/cheered-by";
+import { CheersButton } from "@/components/cheers/cheers-button";
 import { LogDetails } from "@/components/logs/log-details";
 import { LogOwnerActions } from "@/components/logs/log-owner-actions";
 import { getLog, getViewerId } from "@/lib/logs/queries";
@@ -26,6 +28,14 @@ async function LogById({ params }: { params: PageProps<"/logs/[id]">["params"] }
   return (
     <div className="space-y-4">
       <LogDetails log={log} />
+      <section aria-label="Cheers" className="space-y-3">
+        <CheersButton
+          logId={log.id}
+          count={log.cheers.count}
+          viewerCheered={log.cheers.viewerCheered}
+        />
+        <CheeredBy cheerers={log.cheers.cheerers} />
+      </section>
       {log.authorId === viewerId && <LogOwnerActions logId={log.id} />}
     </div>
   );
