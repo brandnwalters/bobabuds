@@ -1,14 +1,14 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { useActionState, useState, useSyncExternalStore } from "react";
+import { useActionState, useId, useState, useSyncExternalStore } from "react";
 
 import { ShopPicker } from "@/components/logs/shop-picker";
 import { StarRatingInput } from "@/components/logs/star-rating-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createLog, type LogFormState } from "@/lib/logs/actions";
+import { createLog, type LogFormState, updateLog } from "@/lib/logs/actions";
 import {
   DRINK_NAME_MAX,
   ICE_LABELS,
@@ -20,6 +20,7 @@ import {
   type IceLevel,
   type LogField,
 } from "@/lib/logs/fields";
+import type { LogWithShop } from "@/lib/logs/queries";
 import type { ShopDetails } from "@/lib/places/types";
 import { cn } from "@/lib/utils";
 
@@ -38,25 +39,33 @@ function useToday() {
   );
 }
 
-/** The single-screen Log form, in spec order: shop, drink, rating, date, then the optional extras. */
-export function LogForm() {
-  const [state, formAction, pending] = useActionState(createLog, initialState);
+/**
+ * The single-screen Log form, in spec order: shop, drink, rating, date, then
+ * the optional extras. Without `log` it creates a Log; with `log` it starts
+ * from that Log's values and saves over it.
+ */
+export function LogForm({ log }: { log?: LogWithShop }) {
+  const [state, formAction, pending] = useActionState(
+    log ? updateLog.bind(null, log.id) : createLog,
+    initialState,
+  );
   const errors = state.errors;
+  const formId = useId();
 
-  const [shop, setShop] = useState<ShopDetails | null>(null);
-  const [drinkName, setDrinkName] = useState("");
-  const [rating, setRating] = useState<number | null>(null);
+  const [shop, setShop] = useState<ShopDetails | null>(log ? shopDetails(log) : null);
+  const [drinkName, setDrinkName] = useState(log?.drinkName ?? "");
+  const [rating, setRating] = useState<number | null>(log?.rating ?? null);
   const today = useToday();
-  const [drankOn, setDrankOn] = useState<string | null>(null);
-  const [sweetness, setSweetness] = useState<number | null>(null);
-  const [ice, setIce] = useState<IceLevel | null>(null);
-  const [toppings, setToppings] = useState<string[]>([]);
+  const [drankOn, setDrankOn] = useState<string | null>(log?.drankOn ?? null);
+  const [sweetness, setSweetness] = useState<number | null>(log?.sweetness ?? null);
+  const [ice, setIce] = useState<IceLevel | null>(log?.ice ?? null);
+  const [toppings, setToppings] = useState<string[]>(log?.toppings ?? []);
   const [customTopping, setCustomTopping] = useState("");
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(log?.note ?? "");
 
   const errorProps = (field: LogField) =>
     errors[field]
-      ? { "aria-invalid": true as const, "aria-describedby": `${field}-error` }
+      ? { "aria-invalid": true as const, "aria-describedby": `${formId}-${field}-error` }
       : {};
 
   function toggleTopping(topping: string) {
@@ -83,22 +92,22 @@ export function LogForm() {
   return (
     <form action={formAction} className="space-y-6" noValidate>
       <div className="space-y-2">
-        <Label htmlFor="shop">Shop</Label>
+        <Label htmlFor={`${formId}-shop`}>Shop</Label>
         <ShopPicker
-          id="shop"
+          id={`${formId}-shop`}
           value={shop}
           onChange={setShop}
           invalid={!!errors.shop && !shop}
-          describedBy={errors.shop ? "shop-error" : undefined}
+          describedBy={errors.shop ? `${formId}-shop-error` : undefined}
         />
         <input type="hidden" name="shop" value={shop ? JSON.stringify(shop) : ""} />
-        <FieldError field="shop" errors={errors} hide={!!shop} />
+        <FieldError formId={formId} field="shop" errors={errors} hide={!!shop} />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="drinkName">Drink</Label>
+        <Label htmlFor={`${formId}-drinkName`}>Drink</Label>
         <Input
-          id="drinkName"
+          id={`${formId}-drinkName`}
           name="drinkName"
           value={drinkName}
           onChange={(event) => setDrinkName(event.target.value)}
@@ -107,26 +116,27 @@ export function LogForm() {
           autoComplete="off"
           {...errorProps("drinkName")}
         />
-        <FieldError field="drinkName" errors={errors} />
+        <FieldError formId={formId} field="drinkName" errors={errors} />
       </div>
 
       <fieldset className="space-y-2">
-        <legend id="rating-legend" className="text-sm font-medium">
+        <legend id={`${formId}-rating-legend`} className="text-sm font-medium">
           Rating
         </legend>
         <StarRatingInput
           value={rating}
           onChange={setRating}
           invalid={!!errors.rating}
-          describedBy={errors.rating ? "rating-error" : undefined}
+          describedBy={errors.rating ? `${formId}-rating-error` : undefined}
+          labelledBy={`${formId}-rating-legend`}
         />
-        <FieldError field="rating" errors={errors} hide={rating !== null} />
+        <FieldError formId={formId} field="rating" errors={errors} hide={rating !== null} />
       </fieldset>
 
       <div className="space-y-2">
-        <Label htmlFor="drankOn">Date</Label>
+        <Label htmlFor={`${formId}-drankOn`}>Date</Label>
         <Input
-          id="drankOn"
+          id={`${formId}-drankOn`}
           name="drankOn"
           type="date"
           value={drankOn ?? today}
@@ -135,7 +145,7 @@ export function LogForm() {
           className="w-auto"
           {...errorProps("drankOn")}
         />
-        <FieldError field="drankOn" errors={errors} />
+        <FieldError formId={formId} field="drankOn" errors={errors} />
       </div>
 
       <div className="space-y-6 border-t pt-6">
@@ -153,7 +163,7 @@ export function LogForm() {
           ))}
         </ChipGroup>
         <input type="hidden" name="sweetness" value={sweetness ?? ""} />
-        <FieldError field="sweetness" errors={errors} />
+        <FieldError formId={formId} field="sweetness" errors={errors} />
 
         <ChipGroup label="Ice">
           {ICE_LEVELS.map((level) => (
@@ -167,7 +177,7 @@ export function LogForm() {
           ))}
         </ChipGroup>
         <input type="hidden" name="ice" value={ice ?? ""} />
-        <FieldError field="ice" errors={errors} />
+        <FieldError formId={formId} field="ice" errors={errors} />
 
         <div className="space-y-3">
           <ChipGroup label="Toppings">
@@ -218,13 +228,13 @@ export function LogForm() {
               Add<span className="sr-only"> topping</span>
             </Button>
           </div>
-          <FieldError field="toppings" errors={errors} />
+          <FieldError formId={formId} field="toppings" errors={errors} />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="note">Note</Label>
+          <Label htmlFor={`${formId}-note`}>Note</Label>
           <textarea
-            id="note"
+            id={`${formId}-note`}
             name="note"
             value={note}
             onChange={(event) => setNote(event.target.value)}
@@ -237,7 +247,7 @@ export function LogForm() {
           <p className="text-right text-xs text-muted-foreground tabular-nums">
             {note.length}/{NOTE_MAX}
           </p>
-          <FieldError field="note" errors={errors} />
+          <FieldError formId={formId} field="note" errors={errors} />
         </div>
       </div>
 
@@ -248,31 +258,44 @@ export function LogForm() {
       )}
 
       <Button type="submit" size="lg" className="w-full" disabled={pending}>
-        {pending ? "Saving…" : "Save Log"}
+        {pending ? "Saving…" : log ? "Save changes" : "Save Log"}
       </Button>
     </form>
   );
 }
 
+function shopDetails({ shop }: LogWithShop): ShopDetails {
+  return {
+    placeId: shop.placeId,
+    name: shop.name,
+    formattedAddress: shop.formattedAddress,
+    latitude: shop.latitude,
+    longitude: shop.longitude,
+    googleMapsUrl: shop.googleMapsUrl,
+  };
+}
+
 function FieldError({
+  formId,
   field,
   errors,
   hide,
 }: {
+  formId: string;
   field: LogField;
   errors: LogFormState["errors"];
   hide?: boolean;
 }) {
   if (!errors[field] || hide) return null;
   return (
-    <p id={`${field}-error`} className="text-sm text-destructive">
+    <p id={`${formId}-${field}-error`} className="text-sm text-destructive">
       {errors[field]}
     </p>
   );
 }
 
 function ChipGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  const id = `${label.toLowerCase()}-label`;
+  const id = useId();
   return (
     <div className="space-y-2">
       <p id={id} className="text-sm font-medium">

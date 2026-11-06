@@ -84,6 +84,7 @@ export function parseLogForm(
   const drankOn = text("drankOn");
   if (!drankOn) errors.drankOn = "Pick the date.";
   else if (!isIsoDate(drankOn)) errors.drankOn = "That isn't a valid date.";
+  else if (drankOn > latestToday()) errors.drankOn = "The date can't be in the future.";
 
   const sweetnessText = text("sweetness");
   const sweetness = sweetnessText ? Number(sweetnessText) : null;
@@ -113,6 +114,15 @@ export function parseLogForm(
   return {
     input: { shop, drinkName, rating, drankOn, sweetness, ice, toppings, note },
   };
+}
+
+/**
+ * Today's date (`YYYY-MM-DD`) in the time zone furthest ahead (UTC+14).
+ * The server doesn't know the user's time zone, so a date after this is in
+ * the future for everyone, while "today" stays allowed for everyone.
+ */
+function latestToday(now = new Date()) {
+  return new Date(now.getTime() + 14 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 function isIsoDate(value: string) {
