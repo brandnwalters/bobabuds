@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { TabBar } from "@/components/app-shell/tab-bar";
+import { FriendsBadge } from "@/components/friends/friends-badge";
 
 /**
  * The signed-in app frame: header with the wordmark, the main column and the
@@ -17,7 +18,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Boba <span className="text-primary">Buds</span>
           </Link>
           <div className="hidden md:block">
-            <TabBar />
+            <TabBar friendsBadge={<FriendsBadge />} />
           </div>
         </div>
       </header>
@@ -25,7 +26,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <div className="md:hidden">
-        <TabBar />
+        <TabBar friendsBadge={<FriendsBadge />} />
       </div>
     </div>
   );

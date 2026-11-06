@@ -20,23 +20,30 @@ function isActive(pathname: string, href: string) {
 
 /**
  * Main navigation. A fixed bottom tab bar on mobile; an inline pill row in
- * the header on desktop (md and up).
+ * the header on desktop (md and up). `friendsBadge` is shown on the Friends
+ * tab (the pending-request count, streamed in from the server).
  */
-export function TabBar() {
+export function TabBar({ friendsBadge }: { friendsBadge?: React.ReactNode }) {
   // usePathname is URL data: on dynamic routes (e.g. /logs/[id]) it must sit
   // inside Suspense. The fallback is the same bar with no tab marked current.
   return (
-    <Suspense fallback={<Tabs pathname={null} />}>
-      <TabsAtCurrentPath />
+    <Suspense fallback={<Tabs pathname={null} friendsBadge={friendsBadge} />}>
+      <TabsAtCurrentPath friendsBadge={friendsBadge} />
     </Suspense>
   );
 }
 
-function TabsAtCurrentPath() {
-  return <Tabs pathname={usePathname()} />;
+function TabsAtCurrentPath({ friendsBadge }: { friendsBadge?: React.ReactNode }) {
+  return <Tabs pathname={usePathname()} friendsBadge={friendsBadge} />;
 }
 
-function Tabs({ pathname }: { pathname: string | null }) {
+function Tabs({
+  pathname,
+  friendsBadge,
+}: {
+  pathname: string | null;
+  friendsBadge?: React.ReactNode;
+}) {
   return (
     <nav
       aria-label="Main"
@@ -55,7 +62,7 @@ function Tabs({ pathname }: { pathname: string | null }) {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 py-2 text-xs font-semibold text-muted-foreground transition-colors",
+                  "relative flex flex-col items-center gap-0.5 py-2 text-xs font-semibold text-muted-foreground transition-colors",
                   "md:flex-row md:gap-1.5 md:rounded-full md:px-3 md:py-1.5 md:text-sm md:hover:bg-accent",
                   active && "text-primary md:bg-matcha-100",
                 )}
@@ -72,6 +79,7 @@ function Tabs({ pathname }: { pathname: string | null }) {
                   {prominent && <span aria-hidden>+ </span>}
                   {label}
                 </span>
+                {href === "/friends" && friendsBadge}
               </Link>
             </li>
           );

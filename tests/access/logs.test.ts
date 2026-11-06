@@ -169,6 +169,90 @@ describe("logs", () => {
     expect(data).toEqual([]);
   });
 
+  it("the author can update and delete their own Log", async () => {
+    const mia = await signInAsSeeded("mia");
+    const shopId = await createShop(mia.client);
+    const { data: created } = await mia.client
+      .from("logs")
+      .insert(newLog(shopId))
+      .select("id")
+      .single();
+
+    const { data: updated, error } = await mia.client
+      .from("logs")
+      .update({ rating: 2, note: "Changed my mind" })
+      .eq("id", created!.id)
+      .select("rating, note")
+      .single();
+    expect(error).toBeNull();
+    expect(updated).toEqual({ rating: 2, note: "Changed my mind" });
+
+    const { error: deleteError } = await mia.client
+      .from("logs")
+      .delete()
+      .eq("id", created!.id);
+    expect(deleteError).toBeNull();
+    const { data } = await mia.client.from("logs").select("id").eq("id", created!.id);
+    expect(data).toEqual([]);
+  });
+
+  it("another user can't update or delete the author's Log", async () => {
+    const mia = await signInAsSeeded("mia");
+    const casey = await signInAsSeeded("casey");
+    const shopId = await createShop(mia.client);
+    const log = newLog(shopId);
+    const { data: created } = await mia.client
+      .from("logs")
+      .insert(log)
+      .select("id")
+      .single();
+
+    const { data: changed } = await casey.client
+      .from("logs")
+      .update({ rating: 0.5 })
+      .eq("id", created!.id)
+      .select("id");
+    expect(changed ?? []).toEqual([]);
+
+    const { data: removed } = await casey.client
+      .from("logs")
+      .delete()
+      .eq("id", created!.id)
+      .select("id");
+    expect(removed ?? []).toEqual([]);
+
+    const { data } = await mia.client
+      .from("logs")
+      .select("rating")
+      .eq("id", created!.id)
+      .single();
+    expect(data).toEqual({ rating: log.rating });
+  });
+
+  it("the author can't hand their Log to someone else", async () => {
+    const mia = await signInAsSeeded("mia");
+    const casey = await signInAsSeeded("casey");
+    const shopId = await createShop(mia.client);
+    const { data: created } = await mia.client
+      .from("logs")
+      .insert(newLog(shopId))
+      .select("id")
+      .single();
+
+    const { error } = await mia.client
+      .from("logs")
+      .update({ author_id: casey.user.id })
+      .eq("id", created!.id);
+    expect(error).not.toBeNull();
+
+    const { data } = await mia.client
+      .from("logs")
+      .select("author_id")
+      .eq("id", created!.id)
+      .single();
+    expect(data).toEqual({ author_id: mia.user.id });
+  });
+
   it("rejects ratings outside 0.5 to 5 in half steps, and bad options", async () => {
     const mia = await signInAsSeeded("mia");
     const shopId = await createShop(mia.client);

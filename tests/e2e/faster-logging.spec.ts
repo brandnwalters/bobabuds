@@ -20,14 +20,15 @@ test("the Log form offers your recent shops and the drinks you've had there", as
 }) => {
   const id = randomUUID().slice(0, 6);
   const mine = [`Wintermelon Tea ${id}`, `Hokkaido Milk Tea ${id}`];
-  const theirs = `Someone Else's Slush ${id}`;
+  const theirs = `Jordan's Slush ${id}`;
 
-  // Another user's Log at the same shop must not show up as a suggestion.
+  // A friend's Log at the same shop: priya can see it, but suggestions come
+  // only from her own Logs.
   await signInAs(page, "jordan", { next: "/log" });
   await logDrink(page, "Quickly Tea House", theirs);
 
-  // Casey's past Logs: two at the same shop, so it should appear only once.
-  await signInAs(page, "casey", { next: "/log" });
+  // Priya's past Logs: two at the same shop, so it should appear only once.
+  await signInAs(page, "priya", { next: "/log" });
   for (const drink of mine) await logDrink(page, "Quickly Tea House", drink);
 
   await page.goto("/log");
