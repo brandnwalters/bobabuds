@@ -49,13 +49,17 @@ function useToday() {
  * the optional extras. Without `log` it creates a Log; with `log` it starts
  * from that Log's values and saves over it. `suggestions` (recent shops and
  * drink names from the user's own Logs) power the shop and drink shortcuts.
+ * `builtInShops` lets the shop search use the built-in list when there's no
+ * Google key; pass `devToolsEnabled()`.
  */
 export function LogForm({
   log,
   suggestions = { recentShops: [], drinksByPlaceId: {} },
+  builtInShops = false,
 }: {
   log?: LogWithPhoto;
   suggestions?: LogSuggestions;
+  builtInShops?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
     log ? updateLog.bind(null, log.id) : createLog,
@@ -122,6 +126,7 @@ export function LogForm({
           value={shop}
           onChange={setShop}
           recentShops={recentShops}
+          builtInShops={builtInShops}
           invalid={!!errors.shop && !shop}
           describedBy={errors.shop ? `${formId}-shop-error` : undefined}
         />

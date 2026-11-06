@@ -96,10 +96,12 @@ it wipes the database.
 ## Google Places key
 
 The Log form searches for shops with Google Places Autocomplete in the
-browser, using `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`. Without a key, it searches a
-built-in list of real Chapel Hill/Durham shops (`src/lib/places/fallback.ts`)
-instead. The browser tests rely on that list, so run them without a key. Shops
-from the list get `dev-fallback:` place IDs, not real Google ones.
+browser, using `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`. Without a key, and only
+when `DEV_TOOLS=true`, it searches a built-in list of real Chapel Hill/Durham
+shops (`src/lib/places/fallback.ts`) instead; without a key or dev tools, shop
+search is unavailable. The browser tests rely on that list, so run them
+without a key. Shops from the list get `dev-fallback:` place IDs, not real
+Google ones.
 
 To use real autocomplete:
 

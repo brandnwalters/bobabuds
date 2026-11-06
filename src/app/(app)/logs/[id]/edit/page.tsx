@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { LogForm } from "@/components/logs/log-form";
+import { devToolsEnabled } from "@/lib/dev/dev-tools";
 import { getLog, getViewerId } from "@/lib/logs/queries";
 import { getLogSuggestions } from "@/lib/logs/suggestions";
 
@@ -35,5 +36,7 @@ async function EditLogForm({
   ]);
   // Only the author edits; to anyone else this page doesn't exist.
   if (!log || log.authorId !== viewerId) notFound();
-  return <LogForm log={log} suggestions={suggestions} />;
+  return (
+    <LogForm log={log} suggestions={suggestions} builtInShops={devToolsEnabled()} />
+  );
 }
