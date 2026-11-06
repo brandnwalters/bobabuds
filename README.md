@@ -69,7 +69,7 @@ session, so the app then behaves exactly as it would for that user. The
 so you land on the setup screen; use it to try onboarding without email.
 
 The Dev Bar uses the dev-only route `/auth/dev-sign-in?as=<username>&next=<path>`
-(or `?as=new`), which signs in with the service-role key. It returns 404
+(or a POST to `?as=new`), which signs in with the service-role key. It returns 404
 unless `DEV_TOOLS=true`, and 403 for any account that isn't a seeded user.
 
 ### Checking the privacy rules by hand

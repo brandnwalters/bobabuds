@@ -57,3 +57,14 @@ test("a signed-out visitor can sign in from the Dev Bar", async ({ page }) => {
   ).toBeVisible();
   await expect(devBarToggle(page)).toHaveText("Dev Bar: @casey");
 });
+
+test("New user in the Dev Bar starts a fresh account at onboarding", async ({
+  page,
+}) => {
+  await page.goto("/sign-in");
+  await devBarToggle(page).click();
+  await devBar(page).getByRole("button", { name: /New user/ }).click();
+
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(devBarToggle(page)).toHaveText("Dev Bar: no profile");
+});

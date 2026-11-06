@@ -52,7 +52,7 @@ export function seededEmail(username: SeededUsername) {
 }
 
 /**
- * `?as=new` on the dev sign-in route (the Dev Bar's "New user" entry) creates
+ * `POST ?as=new` on the dev sign-in route (the Dev Bar's "New user" entry) creates
  * a fresh account flagged as seeded but with no profile, so it lands on
  * onboarding. Lets the setup step be checked on a preview, with no email.
  */
