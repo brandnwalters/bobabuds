@@ -66,7 +66,7 @@ describe("profiles", () => {
 
     const { data: hijacked } = await mallory.client
       .from("profiles")
-      .update({ display_name: "Hacked", username: freshUsername("hacked") })
+      .update({ display_name: "Hacked" })
       .eq("id", alice.user.id)
       .select();
     expect(hijacked).toEqual([]);
@@ -77,6 +77,25 @@ describe("profiles", () => {
       .eq("id", alice.user.id)
       .single();
     expect(data).toEqual({ username, display_name: "Alice B" });
+  });
+
+  it("a username can't be changed after onboarding", async () => {
+    const alice = await signInAsNewUser();
+    const username = freshUsername("alice");
+    await createProfile(alice.client, alice.user.id, username, "Alice");
+
+    const { error } = await alice.client
+      .from("profiles")
+      .update({ username: freshUsername("renamed") })
+      .eq("id", alice.user.id);
+    expect(error?.code).toBe("42501");
+
+    const { data } = await alice.client
+      .from("profiles")
+      .select("username")
+      .eq("id", alice.user.id)
+      .single();
+    expect(data).toEqual({ username });
   });
 
   it("usernames are unique regardless of case", async () => {
