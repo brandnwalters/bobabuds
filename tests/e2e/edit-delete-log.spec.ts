@@ -65,7 +65,7 @@ test("the author edits a Log's rating and then deletes it", async ({ page }) => 
 
   await expect(page).toHaveURL(/\/profile$/);
   await expect(
-    page.getByRole("heading", { level: 1, name: "Profile" }),
+    page.getByRole("heading", { level: 1, name: "Jordan Lee" }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: new RegExp(drink) })).toHaveCount(0);
   await page.goto(logUrl);

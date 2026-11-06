@@ -3,6 +3,7 @@ import "server-only";
 import { connection } from "next/server";
 import { cache } from "react";
 
+import { withAvatarUrls } from "@/lib/profiles/avatar-urls";
 import { USERNAME_MAX } from "@/lib/profiles/validation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,6 +13,8 @@ export type Bud = {
   username: string;
   displayName: string;
   avatarPath: string | null;
+  /** Short-lived signed URL of the avatar (null without one). */
+  avatarUrl: string | null;
 };
 
 /**
@@ -31,7 +34,7 @@ type ProfileRow = {
   avatar_path: string | null;
 };
 
-function toBud(row: ProfileRow): Bud {
+function toBud(row: ProfileRow): Omit<Bud, "avatarUrl"> {
   return {
     id: row.id,
     username: row.username,
@@ -81,16 +84,22 @@ export async function getFriendsOverview(): Promise<{
   const requestRows = requests.data as unknown as RequestRow[];
   const friendshipRows = friendships.data as unknown as FriendshipRow[];
 
+  const incoming = requestRows
+    .filter((r) => r.sender_id !== userId)
+    .map((r) => toBud(r.sender));
+  const outgoing = requestRows
+    .filter((r) => r.sender_id === userId)
+    .map((r) => toBud(r.recipient));
+  const friends = friendshipRows
+    .map((f) => toBud(f.user_a === userId ? f.b : f.a))
+    .sort((x, y) => x.displayName.localeCompare(y.displayName));
+
+  // Sign every avatar in one request, then split the lists again.
+  const signed = await withAvatarUrls(supabase, [...incoming, ...outgoing, ...friends]);
   return {
-    incoming: requestRows
-      .filter((r) => r.sender_id !== userId)
-      .map((r) => toBud(r.sender)),
-    outgoing: requestRows
-      .filter((r) => r.sender_id === userId)
-      .map((r) => toBud(r.recipient)),
-    friends: friendshipRows
-      .map((f) => toBud(f.user_a === userId ? f.b : f.a))
-      .sort((x, y) => x.displayName.localeCompare(y.displayName)),
+    incoming: signed.slice(0, incoming.length),
+    outgoing: signed.slice(incoming.length, incoming.length + outgoing.length),
+    friends: signed.slice(incoming.length + outgoing.length),
   };
 }
 
@@ -126,9 +135,12 @@ export async function searchBuds(
     .limit(SEARCH_LIMIT);
   if (error) throw error;
 
-  const relationships = await relationshipsWith(data.map((row) => row.id));
-  return data.map((row) => ({
-    ...toBud(row),
+  const [relationships, buds] = await Promise.all([
+    relationshipsWith(data.map((row) => row.id)),
+    withAvatarUrls(supabase, data.map(toBud)),
+  ]);
+  return buds.map((row) => ({
+    ...row,
     relationship: relationships.get(row.id) ?? "none",
   }));
 }

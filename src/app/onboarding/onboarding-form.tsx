@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 
+import { AvatarPicker } from "@/components/profiles/avatar-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,8 @@ import {
   type CreateProfileState,
   type UsernameCheck,
 } from "@/lib/onboarding/actions";
+import { type ImageChoice, setImageChoice } from "@/lib/images/upload";
+import { AVATAR_FIELD } from "@/lib/profiles/avatars";
 import {
   DISPLAY_NAME_MAX,
   USERNAME_MAX,
@@ -60,6 +63,8 @@ export function OnboardingForm() {
   );
   const [username, setUsername] = useState(state.username);
   const status = useUsernameStatus(username);
+  const [avatar, setAvatar] = useState<ImageChoice>({ status: "unchanged" });
+  const [avatarBusy, setAvatarBusy] = useState(false);
 
   // A failed submit (e.g. someone took the name meanwhile) wins until edited.
   const usernameMessage =
@@ -70,7 +75,15 @@ export function OnboardingForm() {
     usernameMessage.status === "invalid" || usernameMessage.status === "taken";
 
   return (
-    <form action={formAction} className="space-y-5" noValidate>
+    <form
+      // The avatar lives in state (React resets file inputs after an action).
+      action={(formData) => {
+        setImageChoice(formData, AVATAR_FIELD, avatar);
+        formAction(formData);
+      }}
+      className="space-y-5"
+      noValidate
+    >
       <div className="space-y-2">
         <Label htmlFor="username">Username</Label>
         <div className="relative">
@@ -132,6 +145,22 @@ export function OnboardingForm() {
         )}
       </div>
 
+      <div className="space-y-2">
+        <p className="text-sm font-medium">
+          Avatar <span className="font-normal text-muted-foreground">(optional)</span>
+        </p>
+        <AvatarPicker
+          onChange={setAvatar}
+          onBusyChange={setAvatarBusy}
+          describedBy={state.errors.avatar ? "avatar-error" : undefined}
+        />
+        {state.errors.avatar && (
+          <p id="avatar-error" className="text-sm text-destructive">
+            {state.errors.avatar}
+          </p>
+        )}
+      </div>
+
       {state.errors.form && (
         <p role="alert" className="text-sm text-destructive">
           {state.errors.form}
@@ -141,7 +170,7 @@ export function OnboardingForm() {
       <Button
         type="submit"
         className="w-full"
-        disabled={pending || usernameBad}
+        disabled={pending || usernameBad || avatarBusy}
       >
         {pending ? "Saving…" : "Finish setup"}
       </Button>

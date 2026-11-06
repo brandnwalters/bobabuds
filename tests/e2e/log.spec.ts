@@ -44,7 +44,7 @@ test("a seeded user logs a drink and sees it on their Profile", async ({
     .getByRole("link", { name: "Profile" })
     .click();
   await expect(
-    page.getByRole("heading", { level: 1, name: "Profile" }),
+    page.getByRole("heading", { level: 1, name: "Priya Patel" }),
   ).toBeVisible();
   const entry = page.getByRole("link", { name: new RegExp(drink) });
   await expect(entry).toBeVisible();

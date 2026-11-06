@@ -1,9 +1,11 @@
-import { InitialsAvatar } from "@/components/profiles/initials-avatar";
+import Link from "next/link";
+
+import { Avatar } from "@/components/profiles/avatar";
 import type { Bud } from "@/lib/friends/queries";
 
 /**
- * One person in a Friends page list: initials avatar, display name and
- * @username, with actions on the right.
+ * One person in a Friends page list: avatar, display name (linking to their
+ * Profile) and @username, with actions on the right.
  */
 export function BudRow({
   bud,
@@ -14,9 +16,14 @@ export function BudRow({
 }) {
   return (
     <li className="flex items-center gap-3 py-3">
-      <InitialsAvatar displayName={bud.displayName} />
+      <Avatar url={bud.avatarUrl} displayName={bud.displayName} />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-bold">{bud.displayName}</p>
+        <Link
+          href={`/u/${bud.username}`}
+          className="block truncate font-bold underline-offset-2 hover:underline"
+        >
+          {bud.displayName}
+        </Link>
         <p className="truncate text-sm text-muted-foreground">@{bud.username}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">{children}</div>

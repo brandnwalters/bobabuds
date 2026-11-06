@@ -5,7 +5,7 @@ import { CheersButton } from "@/components/cheers/cheers-button";
 import { TimeAgo } from "@/components/feed/time-ago";
 import { LogPhoto } from "@/components/logs/log-photo";
 import { Stars } from "@/components/logs/stars";
-import { InitialsAvatar } from "@/components/profiles/initials-avatar";
+import { Avatar } from "@/components/profiles/avatar";
 import { ICE_LABELS } from "@/lib/logs/fields";
 import type { FeedLog } from "@/lib/logs/queries";
 
@@ -29,7 +29,7 @@ export function FeedCard({ log }: { log: FeedLog }) {
     >
       <header className="flex items-center gap-3">
         <Link href={profileHref} tabIndex={-1} aria-hidden>
-          <InitialsAvatar displayName={log.author.displayName} />
+          <Avatar url={log.author.avatarUrl} displayName={log.author.displayName} />
         </Link>
         <div className="min-w-0 flex-1">
           <Link

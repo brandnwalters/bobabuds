@@ -42,6 +42,11 @@ const admin = createClient(url, secretKey, {
 
 const ids = new Map<SeededUsername, string>();
 
+// Avatars: placeholder pictures committed in scripts/seed-avatars/. taylor has
+// none, so the initials fallback shows up too.
+const WITHOUT_AVATAR: SeededUsername[] = ["taylor"];
+let avatarCount = 0;
+
 for (const user of SEEDED_USERS) {
   const { data, error } = await admin.auth.admin.createUser({
     email: seededEmail(user.username),
@@ -51,16 +56,31 @@ for (const user of SEEDED_USERS) {
   if (error) throw error;
   ids.set(user.username, data.user.id);
 
+  let avatarPath: string | null = null;
+  if (!WITHOUT_AVATAR.includes(user.username)) {
+    avatarPath = `${data.user.id}/${randomUUID()}.webp`;
+    const { error: avatarError } = await admin.storage
+      .from("avatars")
+      .upload(
+        avatarPath,
+        readFileSync(new URL(`./seed-avatars/${user.username}.webp`, import.meta.url)),
+        { contentType: "image/webp" },
+      );
+    if (avatarError) throw avatarError;
+    avatarCount += 1;
+  }
+
   const { error: profileError } = await admin.from("profiles").insert({
     id: data.user.id,
     username: user.username,
     display_name: user.displayName,
+    avatar_path: avatarPath,
   });
   if (profileError) throw profileError;
 }
 
 console.log(
-  `Seeded ${SEEDED_USERS.length} users: ${SEEDED_USERS.map((u) => `@${u.username}`).join(", ")}`,
+  `Seeded ${SEEDED_USERS.length} users (${avatarCount} with avatars): ${SEEDED_USERS.map((u) => `@${u.username}`).join(", ")}`,
 );
 
 const idOf = (username: SeededUsername) => ids.get(username)!;
