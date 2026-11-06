@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "playwright-report/**",
     "test-results/**",
+    // Agent worktrees (gitignored) live inside the repo checkout.
+    ".claude/**",
   ]),
 ]);
 
