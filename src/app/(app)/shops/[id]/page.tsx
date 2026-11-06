@@ -1,19 +1,18 @@
 import { MapPin } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
+import { FeedCard } from "@/components/feed/feed-card";
+import { Stars } from "@/components/logs/stars";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { createClient } from "@/lib/supabase/server";
+import { getShopPage } from "@/lib/shops/queries";
 
 export const metadata: Metadata = { title: "Shop · Boba Buds" };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-// Basic placeholder linked from Feed cards; the Shop Pages ticket (#13) adds
-// the visible Logs, their average rating and the empty state.
 export default function ShopPage({ params }: PageProps<"/shops/[id]">) {
   return (
     <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
@@ -24,37 +23,82 @@ export default function ShopPage({ params }: PageProps<"/shops/[id]">) {
 
 async function Shop({ params }: { params: PageProps<"/shops/[id]">["params"] }) {
   const { id } = await params;
-  if (!UUID.test(id)) notFound();
   // Per-request: the Supabase session check reads the clock.
   await connection();
-  const supabase = await createClient();
-  const { data: shop, error } = await supabase
-    .from("shops")
-    .select("name, formatted_address, google_maps_url")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw error;
-  if (!shop) notFound();
+  const page = await getShopPage(id);
+  if (!page) notFound();
+  const { shop, logs, averageRating } = page;
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-extrabold tracking-tight">{shop.name}</h1>
-        <p className="flex items-start gap-1.5 text-muted-foreground">
-          <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
-          {shop.formatted_address}
-        </p>
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-extrabold tracking-tight">{shop.name}</h1>
+          <p className="flex items-start gap-1.5 text-muted-foreground">
+            <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
+            {shop.formattedAddress}
+          </p>
+        </div>
+        {averageRating !== null && (
+          <AverageRating rating={averageRating} count={logs.length} />
+        )}
+        <Button asChild variant="secondary">
+          <a href={shop.googleMapsUrl} target="_blank" rel="noreferrer">
+            Open in Google Maps
+          </a>
+        </Button>
       </div>
-      <Button asChild variant="secondary">
-        <a href={shop.google_maps_url} target="_blank" rel="noreferrer">
-          Open in Google Maps
-        </a>
-      </Button>
-      <Card>
-        <CardContent className="text-muted-foreground">
-          What your buds thought of this shop is coming soon.
-        </CardContent>
-      </Card>
+
+      <section aria-labelledby="shop-logs-heading" className="space-y-3">
+        <h2 id="shop-logs-heading" className="text-lg font-extrabold">
+          What your buds had here
+        </h2>
+        {logs.length === 0 ? (
+          <Card>
+            <CardContent className="space-y-4 text-center">
+              <p className="text-lg font-bold">No Logs here yet</p>
+              <p className="text-muted-foreground">
+                Neither you nor your friends have logged a drink at {shop.name}.
+                Be the first!
+              </p>
+              <Button asChild>
+                <Link href="/log">Log a drink</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <ul aria-label="Logs at this shop" className="space-y-4">
+            {logs.map((log) => (
+              <li key={log.id}>
+                <FeedCard log={log} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function AverageRating({ rating, count }: { rating: number; count: number }) {
+  const rounded = Math.round(rating * 10) / 10;
+  return (
+    <div
+      role="group"
+      aria-label="Average rating"
+      className="flex flex-wrap items-center gap-2"
+    >
+      {/* Stars show the nearest half star, so only the number is announced. */}
+      <span aria-hidden className="contents">
+        <Stars rating={Math.round(rating * 2) / 2} />
+      </span>
+      <span data-testid="average-rating-value" className="text-lg font-extrabold">
+        {rounded.toFixed(1)}
+      </span>
+      <span className="sr-only">out of 5 stars,</span>
+      <span className="text-sm text-muted-foreground">
+        from {count} {count === 1 ? "Log" : "Logs"}
+      </span>
     </div>
   );
 }

@@ -136,6 +136,19 @@ type FeedRow = LogRow & {
   };
 };
 
+/** Maps a FEED_COLUMNS row; shared by the Feed and the Shop Page. */
+function toFeedLog(row: FeedRow): FeedLog {
+  return {
+    ...toLog(row),
+    author: {
+      id: row.author.id,
+      username: row.author.username,
+      displayName: row.author.display_name,
+      avatarPath: row.author.avatar_path,
+    },
+  };
+}
+
 // Cursor = "<created_at>|<id>" of the last Log on the previous page. It comes
 // back from the browser, so it is parsed strictly before it reaches a filter.
 const CURSOR =
@@ -177,16 +190,29 @@ export async function listFeed(
 
   const rows = data.slice(0, pageSize);
   return {
-    logs: rows.map((row) => ({
-      ...toLog(row),
-      author: {
-        id: row.author.id,
-        username: row.author.username,
-        displayName: row.author.display_name,
-        avatarPath: row.author.avatar_path,
-      },
-    })),
+    logs: rows.map(toFeedLog),
     nextCursor:
       data.length > pageSize ? encodeCursor(rows[rows.length - 1]!) : null,
   };
+}
+
+// Shop Page ------------------------------------------------------------------
+
+/**
+ * Every Log at a shop that the signed-in user can view (their own and their
+ * friends', enforced by row-level security), newest created first, as Feed
+ * cards.
+ */
+export async function listShopLogs(shopId: string): Promise<FeedLog[]> {
+  if (!UUID.test(shopId)) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("logs")
+    .select(FEED_COLUMNS)
+    .eq("shop_id", shopId)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .returns<FeedRow[]>();
+  if (error) throw error;
+  return data.map(toFeedLog);
 }
