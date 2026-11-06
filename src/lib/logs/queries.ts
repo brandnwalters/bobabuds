@@ -1,5 +1,11 @@
 import "server-only";
 
+import {
+  CHEERS_EMBED,
+  toCheers,
+  type CheersRow,
+  type CheersSummary,
+} from "@/lib/cheers/summary";
 import type { IceLevel } from "@/lib/logs/fields";
 import type { ShopDetails } from "@/lib/places/types";
 import { createClient } from "@/lib/supabase/server";
@@ -67,19 +73,28 @@ function toLog(row: LogRow): LogWithShop {
   };
 }
 
+/** A Log with its Cheers, as seen by the signed-in viewer. */
+export type WithCheers = { cheers: CheersSummary };
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A Log the signed-in user may see, or null (row-level security decides). */
-export async function getLog(id: string): Promise<LogWithShop | null> {
+export async function getLog(
+  id: string,
+): Promise<(LogWithShop & WithCheers) | null> {
   if (!UUID.test(id)) return null;
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("logs")
-    .select(LOG_COLUMNS)
-    .eq("id", id)
-    .maybeSingle<LogRow>();
+  const [{ data, error }, claims] = await Promise.all([
+    supabase
+      .from("logs")
+      .select(`${LOG_COLUMNS}, ${CHEERS_EMBED}`)
+      .eq("id", id)
+      .maybeSingle<LogRow & { cheers: CheersRow[] }>(),
+    supabase.auth.getClaims(),
+  ]);
   if (error) throw error;
-  return data ? toLog(data) : null;
+  const viewerId = claims.data?.claims.sub ?? null;
+  return data ? { ...toLog(data), cheers: toCheers(data.cheers, viewerId) } : null;
 }
 
 /** The signed-in user's id, or null when signed out. */
@@ -107,8 +122,8 @@ export async function listMyLogs(): Promise<LogWithShop[]> {
 
 // Feed -----------------------------------------------------------------------
 
-/** A Log in the Feed: the Log, its shop and its author. */
-export type FeedLog = LogWithShop & {
+/** A Log in the Feed: the Log, its shop, its author and its Cheers. */
+export type FeedLog = LogWithShop & WithCheers & {
   author: {
     id: string;
     username: string;
@@ -125,7 +140,7 @@ export type FeedPage = {
 
 export const FEED_PAGE_SIZE = 10;
 
-const FEED_COLUMNS = `${LOG_COLUMNS}, author:profiles!logs_author_id_fkey!inner(id, username, display_name, avatar_path)`;
+const FEED_COLUMNS = `${LOG_COLUMNS}, author:profiles!logs_author_id_fkey!inner(id, username, display_name, avatar_path), ${CHEERS_EMBED}`;
 
 type FeedRow = LogRow & {
   author: {
@@ -134,6 +149,7 @@ type FeedRow = LogRow & {
     display_name: string;
     avatar_path: string | null;
   };
+  cheers: CheersRow[];
 };
 
 // Cursor = "<created_at>|<id>" of the last Log on the previous page. It comes
@@ -172,8 +188,12 @@ export async function listFeed(
     );
   }
 
-  const { data, error } = await query.returns<FeedRow[]>();
+  const [{ data, error }, claims] = await Promise.all([
+    query.returns<FeedRow[]>(),
+    supabase.auth.getClaims(),
+  ]);
   if (error) throw error;
+  const viewerId = claims.data?.claims.sub ?? null;
 
   const rows = data.slice(0, pageSize);
   return {
@@ -185,6 +205,7 @@ export async function listFeed(
         displayName: row.author.display_name,
         avatarPath: row.author.avatar_path,
       },
+      cheers: toCheers(row.cheers, viewerId),
     })),
     nextCursor:
       data.length > pageSize ? encodeCursor(rows[rows.length - 1]!) : null,
