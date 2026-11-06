@@ -1,4 +1,5 @@
 import { CalendarDays, MapPin } from "lucide-react";
+import Link from "next/link";
 
 import { Stars } from "@/components/logs/stars";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,14 +22,12 @@ export function LogDetails({ log }: { log: LogWithShop }) {
             <p className="flex items-start gap-1.5 text-muted-foreground">
               <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
               <span>
-                <a
-                  href={log.shop.googleMapsUrl}
-                  target="_blank"
-                  rel="noreferrer"
+                <Link
+                  href={`/shops/${log.shop.id}`}
                   className="font-semibold text-foreground underline-offset-2 hover:underline"
                 >
                   {log.shop.name}
-                </a>
+                </Link>
                 <span className="block text-sm">{log.shop.formattedAddress}</span>
               </span>
             </p>
