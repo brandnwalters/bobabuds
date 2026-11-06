@@ -2,8 +2,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 // E2E_BASE_URL points the suite at an already-running app (e.g. a Vercel
 // preview). Otherwise Playwright starts `pnpm dev` on E2E_PORT (default 3000).
+// Local runs use 127.0.0.1, not localhost: local Supabase Auth only redirects
+// magic links back to its site_url host (127.0.0.1, any port).
 const port = Number(process.env.E2E_PORT ?? 3000);
-const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${port}`;
+const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",

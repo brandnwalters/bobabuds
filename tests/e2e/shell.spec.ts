@@ -1,11 +1,17 @@
 import { expect, test } from "@playwright/test";
 
+import { signInAsNewUser } from "./support/supabase";
+
 const tabs = [
   { name: "Feed", path: "/", heading: "Feed" },
   { name: "Log", path: "/log", heading: "Log a drink" },
   { name: "Friends", path: "/friends", heading: "Friends" },
   { name: "Profile", path: "/profile", heading: "Profile" },
 ];
+
+test.beforeEach(async ({ page }) => {
+  await signInAsNewUser(page);
+});
 
 test("the app shell loads with the Boba Buds tab bar", async ({ page }) => {
   await page.goto("/");
