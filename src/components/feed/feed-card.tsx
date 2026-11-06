@@ -2,6 +2,7 @@ import { MapPin } from "lucide-react";
 import Link from "next/link";
 
 import { TimeAgo } from "@/components/feed/time-ago";
+import { LogPhoto } from "@/components/logs/log-photo";
 import { Stars } from "@/components/logs/stars";
 import { InitialsAvatar } from "@/components/profiles/initials-avatar";
 import { ICE_LABELS } from "@/lib/logs/fields";
@@ -42,6 +43,8 @@ export function FeedCard({ log }: { log: FeedLog }) {
           />
         </div>
       </header>
+
+      <LogPhoto url={log.photoUrl} drinkName={log.drinkName} />
 
       <div className="space-y-1">
         <h2 id={headingId} className="text-lg font-extrabold leading-tight">

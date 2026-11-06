@@ -1,12 +1,13 @@
 import { CalendarDays, MapPin } from "lucide-react";
 
+import { LogPhoto } from "@/components/logs/log-photo";
 import { Stars } from "@/components/logs/stars";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDrankOn, ICE_LABELS } from "@/lib/logs/fields";
-import type { LogWithShop } from "@/lib/logs/queries";
+import type { LogWithPhoto } from "@/lib/logs/queries";
 
 /** Every field of one Log. */
-export function LogDetails({ log }: { log: LogWithShop }) {
+export function LogDetails({ log }: { log: LogWithPhoto }) {
   const extras = [
     log.sweetness !== null ? `${log.sweetness}% sweet` : null,
     log.ice ? ICE_LABELS[log.ice] : null,
@@ -16,6 +17,7 @@ export function LogDetails({ log }: { log: LogWithShop }) {
     <article>
       <Card>
         <CardContent className="space-y-4">
+          <LogPhoto url={log.photoUrl} drinkName={log.drinkName} />
           <div className="space-y-1">
             <h1 className="text-2xl font-extrabold tracking-tight">{log.drinkName}</h1>
             <p className="flex items-start gap-1.5 text-muted-foreground">

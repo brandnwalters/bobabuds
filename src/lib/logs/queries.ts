@@ -1,6 +1,8 @@
 import "server-only";
 
+import { signedImageUrls } from "@/lib/images/storage";
 import type { IceLevel } from "@/lib/logs/fields";
+import { LOG_PHOTOS_BUCKET } from "@/lib/logs/photos";
 import type { ShopDetails } from "@/lib/places/types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,11 +17,16 @@ export type LogWithShop = {
   toppings: string[];
   note: string | null;
   createdAt: string;
+  /** Storage path in the log-photos bucket (sign it to show it). */
+  photoPath: string | null;
   shop: ShopDetails & { id: string };
 };
 
+/** A Log with a short-lived signed URL for its photo (null without one). */
+export type LogWithPhoto = LogWithShop & { photoUrl: string | null };
+
 const LOG_COLUMNS =
-  "id, author_id, drink_name, rating, drank_on, sweetness, ice, toppings, note, created_at, shop:shops!inner(id, place_id, name, formatted_address, latitude, longitude, google_maps_url)";
+  "id, author_id, drink_name, rating, drank_on, sweetness, ice, toppings, note, created_at, photo_path, shop:shops!inner(id, place_id, name, formatted_address, latitude, longitude, google_maps_url)";
 
 type LogRow = {
   id: string;
@@ -32,6 +39,7 @@ type LogRow = {
   toppings: string[];
   note: string | null;
   created_at: string;
+  photo_path: string | null;
   shop: {
     id: string;
     place_id: string;
@@ -55,6 +63,7 @@ function toLog(row: LogRow): LogWithShop {
     toppings: row.toppings,
     note: row.note,
     createdAt: row.created_at,
+    photoPath: row.photo_path,
     shop: {
       id: row.shop.id,
       placeId: row.shop.place_id,
@@ -70,7 +79,7 @@ function toLog(row: LogRow): LogWithShop {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A Log the signed-in user may see, or null (row-level security decides). */
-export async function getLog(id: string): Promise<LogWithShop | null> {
+export async function getLog(id: string): Promise<LogWithPhoto | null> {
   if (!UUID.test(id)) return null;
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -79,7 +88,16 @@ export async function getLog(id: string): Promise<LogWithShop | null> {
     .eq("id", id)
     .maybeSingle<LogRow>();
   if (error) throw error;
-  return data ? toLog(data) : null;
+  if (!data) return null;
+  const urls = await signedImageUrls(supabase, LOG_PHOTOS_BUCKET, [data.photo_path]);
+  return withPhotoUrl(toLog(data), urls);
+}
+
+function withPhotoUrl<T extends LogWithShop>(
+  log: T,
+  urls: Map<string, string>,
+): T & { photoUrl: string | null } {
+  return { ...log, photoUrl: (log.photoPath && urls.get(log.photoPath)) || null };
 }
 
 /** The signed-in user's id, or null when signed out. */
@@ -107,8 +125,8 @@ export async function listMyLogs(): Promise<LogWithShop[]> {
 
 // Feed -----------------------------------------------------------------------
 
-/** A Log in the Feed: the Log, its shop and its author. */
-export type FeedLog = LogWithShop & {
+/** A Log in the Feed: the Log, its shop, its author and its photo URL. */
+export type FeedLog = LogWithPhoto & {
   author: {
     id: string;
     username: string;
@@ -176,9 +194,14 @@ export async function listFeed(
   if (error) throw error;
 
   const rows = data.slice(0, pageSize);
+  const photoUrls = await signedImageUrls(
+    supabase,
+    LOG_PHOTOS_BUCKET,
+    rows.map((row) => row.photo_path),
+  );
   return {
     logs: rows.map((row) => ({
-      ...toLog(row),
+      ...withPhotoUrl(toLog(row), photoUrls),
       author: {
         id: row.author.id,
         username: row.author.username,

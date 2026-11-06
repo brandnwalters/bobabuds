@@ -2,7 +2,10 @@
 
 import { redirect } from "next/navigation";
 
+import { removeImages, uploadImage } from "@/lib/images/storage";
+import { readImageChoice } from "@/lib/images/upload";
 import { type LogInput, parseLogForm, type LogErrors } from "@/lib/logs/fields";
+import { LOG_PHOTOS_BUCKET } from "@/lib/logs/photos";
 import { upsertShop } from "@/lib/shops/upsert";
 import { createClient } from "@/lib/supabase/server";
 
@@ -22,6 +25,33 @@ function logColumns(input: LogInput, shopId: string) {
     toppings: input.toppings,
     note: input.note,
   };
+}
+
+/**
+ * Reads the form's photo field and uploads a new photo into the user's
+ * folder. `photoPath` is the column value to save: a new path, null to
+ * remove the photo, or undefined to leave it alone.
+ */
+async function savePhoto(
+  supabase: Supabase,
+  userId: string,
+  formData: FormData,
+): Promise<{ photoPath?: string | null; error?: string }> {
+  const choice = readImageChoice(formData, "photo");
+  switch (choice.status) {
+    case "invalid":
+      return { error: choice.error };
+    case "unchanged":
+      return {};
+    case "removed":
+      return { photoPath: null };
+    case "new": {
+      const path = await uploadImage(supabase, LOG_PHOTOS_BUCKET, userId, choice.file);
+      return path
+        ? { photoPath: path }
+        : { error: "We couldn't upload your photo. Try again." };
+    }
+  }
 }
 
 async function signedInUser(supabase: Supabase, next: string) {
@@ -46,12 +76,20 @@ export async function createLog(
     return { errors: { form: "We couldn't save that shop. Try again." } };
   }
 
+  const photo = await savePhoto(supabase, userId, formData);
+  if (photo.error) return { errors: { photo: photo.error } };
+
   const { data, error } = await supabase
     .from("logs")
-    .insert({ author_id: userId, ...logColumns(input, shopId) })
+    .insert({
+      author_id: userId,
+      ...logColumns(input, shopId),
+      photo_path: photo.photoPath ?? null,
+    })
     .select("id")
     .single();
   if (error || !data) {
+    await removeImages(supabase, LOG_PHOTOS_BUCKET, [photo.photoPath]);
     return { errors: { form: "We couldn't save your Log. Try again." } };
   }
 
@@ -61,6 +99,7 @@ export async function createLog(
 /**
  * Saves the form over an existing Log, then opens it. Row-level security
  * limits this to the author; anyone else updates nothing and gets an error.
+ * A replaced or removed photo is deleted from Storage.
  * Bind the Log id: `updateLog.bind(null, id)`.
  */
 export async function updateLog(
@@ -72,20 +111,42 @@ export async function updateLog(
   if (errors) return { errors };
 
   const supabase = await createClient();
-  await signedInUser(supabase, `/logs/${id}/edit`);
+  const userId = await signedInUser(supabase, `/logs/${id}/edit`);
 
   const shopId = await upsertShop(supabase, input.shop);
   if (!shopId) {
     return { errors: { form: "We couldn't save that shop. Try again." } };
   }
 
+  // The current photo, to delete once it's replaced or removed.
+  const { data: current } = await supabase
+    .from("logs")
+    .select("photo_path")
+    .eq("id", id)
+    .eq("author_id", userId)
+    .maybeSingle<{ photo_path: string | null }>();
+  if (!current) {
+    return { errors: { form: "We couldn't save your changes. Try again." } };
+  }
+
+  const photo = await savePhoto(supabase, userId, formData);
+  if (photo.error) return { errors: { photo: photo.error } };
+  const photoChanged = photo.photoPath !== undefined;
+
   const { data, error } = await supabase
     .from("logs")
-    .update(logColumns(input, shopId))
+    .update({
+      ...logColumns(input, shopId),
+      ...(photoChanged ? { photo_path: photo.photoPath } : {}),
+    })
     .eq("id", id)
     .select("id");
   if (error || !data || data.length === 0) {
+    await removeImages(supabase, LOG_PHOTOS_BUCKET, [photo.photoPath]);
     return { errors: { form: "We couldn't save your changes. Try again." } };
+  }
+  if (photoChanged) {
+    await removeImages(supabase, LOG_PHOTOS_BUCKET, [current.photo_path]);
   }
 
   redirect(`/logs/${id}`);
@@ -94,9 +155,9 @@ export async function updateLog(
 export type DeleteLogState = { error?: string };
 
 /**
- * Deletes a Log (the database removes anything that hangs off it), then
- * opens the Profile. Only the author can; anyone else deletes nothing.
- * Bind the Log id: `deleteLog.bind(null, id)`.
+ * Deletes a Log (the database removes anything that hangs off it) and its
+ * photo, then opens the Profile. Only the author can; anyone else deletes
+ * nothing. Bind the Log id: `deleteLog.bind(null, id)`.
  */
 export async function deleteLog(id: string): Promise<DeleteLogState> {
   const supabase = await createClient();
@@ -106,10 +167,16 @@ export async function deleteLog(id: string): Promise<DeleteLogState> {
     .from("logs")
     .delete()
     .eq("id", id)
-    .select("id");
+    .select("id, photo_path")
+    .returns<{ id: string; photo_path: string | null }[]>();
   if (error || !data || data.length === 0) {
     return { error: "We couldn't delete this Log. Try again." };
   }
+  await removeImages(
+    supabase,
+    LOG_PHOTOS_BUCKET,
+    data.map((log) => log.photo_path),
+  );
 
   redirect("/profile");
 }

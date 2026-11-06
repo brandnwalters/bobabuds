@@ -41,6 +41,23 @@ describe("seeded users", () => {
     expect(caseyView).toEqual({ friends: [], incoming: [], outgoing: [] });
   });
 
+  test("pnpm seed gives most seeded Logs a photo that friends can load", async () => {
+    const { client } = await signInAsSeeded("mia");
+
+    const { data: logs, error } = await client.from("logs").select("photo_path");
+    expect(error).toBeNull();
+    const photos = logs!.flatMap((log) => (log.photo_path ? [log.photo_path] : []));
+    // mia sees her own and her friends' seeded Logs.
+    expect(photos.length / logs!.length).toBeGreaterThan(0.5);
+
+    const { data: photo, error: downloadError } = await client.storage
+      .from("log-photos")
+      .download(photos[0]!);
+    expect(downloadError).toBeNull();
+    expect(photo!.type).toBe("image/webp");
+    expect(photo!.size).toBeGreaterThan(0);
+  });
+
   test("signInAsSeeded gives a client acting as that seeded user", async () => {
     const { client, user } = await signInAsSeeded("jordan");
 
