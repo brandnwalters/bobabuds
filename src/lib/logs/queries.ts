@@ -154,6 +154,30 @@ type FeedRow = LogRow & {
   };
 };
 
+/**
+ * Maps FEED_COLUMNS rows, signing their photos in one request; shared by the
+ * Feed and the Shop Page.
+ */
+async function toFeedLogs(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  rows: FeedRow[],
+): Promise<FeedLog[]> {
+  const photoUrls = await signedImageUrls(
+    supabase,
+    LOG_PHOTOS_BUCKET,
+    rows.map((row) => row.photo_path),
+  );
+  return rows.map((row) => ({
+    ...withPhotoUrl(toLog(row), photoUrls),
+    author: {
+      id: row.author.id,
+      username: row.author.username,
+      displayName: row.author.display_name,
+      avatarPath: row.author.avatar_path,
+    },
+  }));
+}
+
 // Cursor = "<created_at>|<id>" of the last Log on the previous page. It comes
 // back from the browser, so it is parsed strictly before it reaches a filter.
 const CURSOR =
@@ -194,22 +218,30 @@ export async function listFeed(
   if (error) throw error;
 
   const rows = data.slice(0, pageSize);
-  const photoUrls = await signedImageUrls(
-    supabase,
-    LOG_PHOTOS_BUCKET,
-    rows.map((row) => row.photo_path),
-  );
   return {
-    logs: rows.map((row) => ({
-      ...withPhotoUrl(toLog(row), photoUrls),
-      author: {
-        id: row.author.id,
-        username: row.author.username,
-        displayName: row.author.display_name,
-        avatarPath: row.author.avatar_path,
-      },
-    })),
+    logs: await toFeedLogs(supabase, rows),
     nextCursor:
       data.length > pageSize ? encodeCursor(rows[rows.length - 1]!) : null,
   };
+}
+
+// Shop Page ------------------------------------------------------------------
+
+/**
+ * Every Log at a shop that the signed-in user can view (their own and their
+ * friends', enforced by row-level security), newest created first, as Feed
+ * cards.
+ */
+export async function listShopLogs(shopId: string): Promise<FeedLog[]> {
+  if (!UUID.test(shopId)) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("logs")
+    .select(FEED_COLUMNS)
+    .eq("shop_id", shopId)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .returns<FeedRow[]>();
+  if (error) throw error;
+  return toFeedLogs(supabase, data);
 }
