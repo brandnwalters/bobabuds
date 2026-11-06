@@ -3,12 +3,14 @@
 import { Plus, X } from "lucide-react";
 import { useActionState, useId, useState, useSyncExternalStore } from "react";
 
+import { ImagePicker } from "@/components/images/image-picker";
 import { DrinkNameInput } from "@/components/logs/drink-name-input";
 import { ShopPicker } from "@/components/logs/shop-picker";
 import { StarRatingInput } from "@/components/logs/star-rating-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { type ImageChoice, setImageChoice } from "@/lib/images/upload";
 import { createLog, type LogFormState, updateLog } from "@/lib/logs/actions";
 import {
   DRINK_NAME_MAX,
@@ -21,7 +23,8 @@ import {
   type IceLevel,
   type LogField,
 } from "@/lib/logs/fields";
-import type { LogWithShop } from "@/lib/logs/queries";
+import { PHOTO_MAX_EDGE } from "@/lib/logs/photos";
+import type { LogWithPhoto } from "@/lib/logs/queries";
 import type { LogSuggestions } from "@/lib/logs/suggestions";
 import type { ShopDetails } from "@/lib/places/types";
 import { cn } from "@/lib/utils";
@@ -51,7 +54,7 @@ export function LogForm({
   log,
   suggestions = { recentShops: [], drinksByPlaceId: {} },
 }: {
-  log?: LogWithShop;
+  log?: LogWithPhoto;
   suggestions?: LogSuggestions;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -71,6 +74,8 @@ export function LogForm({
   const [toppings, setToppings] = useState<string[]>(log?.toppings ?? []);
   const [customTopping, setCustomTopping] = useState("");
   const [note, setNote] = useState(log?.note ?? "");
+  const [photo, setPhoto] = useState<ImageChoice>({ status: "unchanged" });
+  const [photoBusy, setPhotoBusy] = useState(false);
   const { recentShops, drinksByPlaceId } = suggestions;
   const drinkSuggestions = (shop && drinksByPlaceId[shop.placeId]) || [];
 
@@ -101,7 +106,15 @@ export function LogForm({
   );
 
   return (
-    <form action={formAction} className="space-y-6" noValidate>
+    <form
+      // The photo lives in state (React resets file inputs after an action).
+      action={(formData) => {
+        setImageChoice(formData, "photo", photo);
+        formAction(formData);
+      }}
+      className="space-y-6"
+      noValidate
+    >
       <div className="space-y-2">
         <Label htmlFor={`${formId}-shop`}>Shop</Label>
         <ShopPicker
@@ -162,6 +175,24 @@ export function LogForm({
 
       <div className="space-y-6 border-t pt-6">
         <p className="text-sm font-semibold text-muted-foreground">Optional</p>
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Photo</p>
+          <ImagePicker
+            initialUrl={log?.photoUrl}
+            maxEdge={PHOTO_MAX_EDGE}
+            labels={{
+              add: "Add photo",
+              replace: "Replace photo",
+              remove: "Remove photo",
+              preview: "Photo preview",
+            }}
+            onChange={setPhoto}
+            onBusyChange={setPhotoBusy}
+            describedBy={errors.photo ? `${formId}-photo-error` : undefined}
+          />
+          <FieldError formId={formId} field="photo" errors={errors} />
+        </div>
 
         <ChipGroup label="Sweetness">
           {SWEETNESS_LEVELS.map((level) => (
@@ -269,14 +300,14 @@ export function LogForm({
         </p>
       )}
 
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+      <Button type="submit" size="lg" className="w-full" disabled={pending || photoBusy}>
         {pending ? "Saving…" : log ? "Save changes" : "Save Log"}
       </Button>
     </form>
   );
 }
 
-function shopDetails({ shop }: LogWithShop): ShopDetails {
+function shopDetails({ shop }: LogWithPhoto): ShopDetails {
   return {
     placeId: shop.placeId,
     name: shop.name,

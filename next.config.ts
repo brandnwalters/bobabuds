@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   // The default bottom-left indicator covers the mobile tab bar's Feed tab.
   devIndicators: { position: "top-right" },
   cacheComponents: true,
+  experimental: {
+    // Log form submissions carry a resized photo (up to IMAGE_MAX_BYTES, 2 MB).
+    serverActions: { bodySizeLimit: "3mb" },
+  },
   partialPrefetching: true,
   turbopack: {
     rules: {

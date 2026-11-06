@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 
+import { SEEDED_LOGS } from "@/lib/dev/seed-logs";
+
 import { signInAsSeeded } from "./support/supabase";
 
 // Needs `pnpm seed`.
@@ -39,6 +41,28 @@ describe("seeded users", () => {
       outgoing: ["taylor"],
     });
     expect(caseyView).toEqual({ friends: [], incoming: [], outgoing: [] });
+  });
+
+  test("pnpm seed gives most seeded Logs a photo that friends can load", async () => {
+    const { client } = await signInAsSeeded("mia");
+
+    // Only the seeded Logs: browser tests keep adding photo-less Logs.
+    const { data: logs, error } = await client
+      .from("logs")
+      .select("photo_path")
+      .in("drink_name", [...new Set(SEEDED_LOGS.map((log) => log.drink))]);
+    expect(error).toBeNull();
+    expect(logs!.length).toBeGreaterThan(0);
+    const photos = logs!.flatMap((log) => (log.photo_path ? [log.photo_path] : []));
+    // mia sees her own and her friends' seeded Logs.
+    expect(photos.length / logs!.length).toBeGreaterThan(0.5);
+
+    const { data: photo, error: downloadError } = await client.storage
+      .from("log-photos")
+      .download(photos[0]!);
+    expect(downloadError).toBeNull();
+    expect(photo!.type).toBe("image/webp");
+    expect(photo!.size).toBeGreaterThan(0);
   });
 
   test("signInAsSeeded gives a client acting as that seeded user", async () => {

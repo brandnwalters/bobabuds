@@ -67,7 +67,8 @@ test("a Shop Page shows friends' Logs and their average, but not a stranger's", 
   const shown = parseFloat(
     (await average.getByTestId("average-rating-value").textContent()) ?? "",
   );
-  expect(Math.abs(shown - mean)).toBeLessThanOrEqual(0.05);
+  // Shown to one decimal (+ a hair for float error).
+  expect(Math.abs(shown - mean)).toBeLessThanOrEqual(0.05 + 1e-9);
 });
 
 test("a Shop Page with no visible Logs shows an empty state", async ({ page }) => {

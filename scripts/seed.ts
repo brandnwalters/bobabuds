@@ -7,6 +7,8 @@
  * Runs with plain Node (type stripping), so imports need `.ts` extensions.
  */
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -104,6 +106,41 @@ const { data: shops, error: shopsError } = await admin
 if (shopsError) throw shopsError;
 const shopIdByName = new Map(shops.map((shop) => [shop.name, shop.id]));
 
+// Log photos: placeholder drink pictures committed in scripts/seed-photos/,
+// uploaded for most Logs (every fifth Log has none, so both cases show up).
+const photoFile = (drink: string) => {
+  const name = drink.toLowerCase();
+  const match = [
+    ["taro", "taro"],
+    ["matcha", "matcha"],
+    ["brown sugar", "brown-sugar"],
+    ["mango", "mango"],
+    ["strawberry", "strawberry"],
+    ["thai", "thai-tea"],
+    ["oolong", "oolong"],
+  ].find(([keyword]) => name.includes(keyword!));
+  return match ? match[1]! : "milk-tea";
+};
+const photoBytes = new Map<string, Buffer>();
+const photoPaths = await Promise.all(
+  SEEDED_LOGS.map(async (log, index) => {
+    if (index % 5 === 4) return null;
+    const file = photoFile(log.drink);
+    if (!photoBytes.has(file)) {
+      photoBytes.set(
+        file,
+        readFileSync(new URL(`./seed-photos/${file}.webp`, import.meta.url)),
+      );
+    }
+    const path = `${idOf(log.author)}/${randomUUID()}.webp`;
+    const { error } = await admin.storage
+      .from("log-photos")
+      .upload(path, photoBytes.get(file)!, { contentType: "image/webp" });
+    if (error) throw error;
+    return path;
+  }),
+);
+
 const HOUR = 60 * 60 * 1000;
 const seedTime = Date.now();
 const { error: logsError } = await admin.from("logs").insert(
@@ -122,6 +159,7 @@ const { error: logsError } = await admin.from("logs").insert(
       ice: log.ice ?? null,
       toppings: log.toppings ?? [],
       note: log.note ?? null,
+      photo_path: photoPaths[index],
       created_at: created.toISOString(),
       updated_at: created.toISOString(),
     };
@@ -129,7 +167,9 @@ const { error: logsError } = await admin.from("logs").insert(
 );
 if (logsError) throw logsError;
 
-console.log(`Seeded ${shops.length} shops and ${SEEDED_LOGS.length} logs`);
+console.log(
+  `Seeded ${shops.length} shops and ${SEEDED_LOGS.length} logs (${photoPaths.filter(Boolean).length} with photos)`,
+);
 
 // Cheers ---------------------------------------------------------------------
 // Only on Logs the cheerer could see: their friend's (checked here, since the

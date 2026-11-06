@@ -56,7 +56,8 @@ export type LogField =
   | "sweetness"
   | "ice"
   | "toppings"
-  | "note";
+  | "note"
+  | "photo";
 export type LogErrors = Partial<Record<LogField | "form", string>>;
 
 /** Reads and checks the Log form. Returns the clean input, or messages per field. */

@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import { signInAsNewUser } from "./supabase";
 
+/** A throwaway signed-in user who has finished onboarding. */
 export type Bud = Awaited<ReturnType<typeof signInAsNewUser>>;
 
-/** A throwaway signed-in user who has finished onboarding. */
 export async function newBud(): Promise<Bud> {
   const bud = await signInAsNewUser();
   const { error } = await bud.client.from("profiles").insert({
@@ -16,7 +16,7 @@ export async function newBud(): Promise<Bud> {
   return bud;
 }
 
-/** Makes `a` and `b` friends (a requests, b accepts). */
+/** Makes `a` and `b` friends through the real request/accept RPCs. */
 export async function befriend(a: Bud, b: Bud) {
   const sent = await a.client.rpc("send_friend_request", {
     recipient: b.user.id,
@@ -29,7 +29,10 @@ export async function befriend(a: Bud, b: Bud) {
 }
 
 /** Creates a Log by `bud` at a fresh shop and returns its id. */
-export async function createLog(bud: Bud) {
+export async function createLog(
+  bud: Bud,
+  extra: Record<string, unknown> = {},
+) {
   const placeId = `test-${randomUUID()}`;
   const { error: shopError } = await bud.client.from("shops").insert({
     place_id: placeId,
@@ -54,6 +57,7 @@ export async function createLog(bud: Bud) {
       drink_name: "Taro Milk Tea",
       rating: 4,
       drank_on: "2026-11-01",
+      ...extra,
     })
     .select("id")
     .single();
