@@ -1,7 +1,8 @@
 /**
  * The seeded users created by `pnpm seed`. The only accounts the Dev Bar and
  * its sign-in route will sign in as. `relation` describes each user relative
- * to the main test user, mia, once later seed data adds relationships.
+ * to the main test user, mia (seeded below in SEEDED_FRIENDSHIPS and
+ * SEEDED_FRIEND_REQUESTS).
  *
  * Kept free of imports so the seed script can load it with plain Node.
  */
@@ -25,6 +26,25 @@ export const SEEDED_USERS = [
 
 export type SeededUser = (typeof SEEDED_USERS)[number];
 export type SeededUsername = SeededUser["username"];
+
+/**
+ * Seeded Friendships and pending Friend Requests, matching each user's
+ * `relation` above. jordan and priya are also friends with each other. casey
+ * has no connections at all.
+ */
+export const SEEDED_FRIENDSHIPS: readonly [SeededUsername, SeededUsername][] = [
+  ["mia", "jordan"],
+  ["mia", "priya"],
+  ["mia", "sam"],
+  ["jordan", "priya"],
+];
+
+/** Pending requests as [sender, recipient]. */
+export const SEEDED_FRIEND_REQUESTS: readonly [SeededUsername, SeededUsername][] =
+  [
+    ["alex", "mia"],
+    ["mia", "taylor"],
+  ];
 
 /** Seeded users sign in by email only through the Dev Bar; nobody reads it. */
 export function seededEmail(username: SeededUsername) {

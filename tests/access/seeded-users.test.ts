@@ -26,6 +26,21 @@ describe("seeded users", () => {
     );
   });
 
+  test("pnpm seed gives mia friends, one request each way, and a stranger", async () => {
+    const mia = await signInAsSeeded("mia");
+    const casey = await signInAsSeeded("casey");
+
+    const miaView = await relationshipsOf(mia.client, mia.user.id);
+    const caseyView = await relationshipsOf(casey.client, casey.user.id);
+
+    expect(miaView).toEqual({
+      friends: ["jordan", "priya", "sam"],
+      incoming: ["alex"],
+      outgoing: ["taylor"],
+    });
+    expect(caseyView).toEqual({ friends: [], incoming: [], outgoing: [] });
+  });
+
   test("signInAsSeeded gives a client acting as that seeded user", async () => {
     const { client, user } = await signInAsSeeded("jordan");
 
@@ -48,3 +63,33 @@ describe("seeded users", () => {
     expect(updated).toEqual([]);
   });
 });
+
+type Client = Awaited<ReturnType<typeof signInAsSeeded>>["client"];
+
+/** Usernames of a user's friends and pending requests, as they see them. */
+async function relationshipsOf(client: Client, userId: string) {
+  const [friendships, requests, profiles] = await Promise.all([
+    client.from("friendships").select("user_a, user_b"),
+    client.from("friend_requests").select("sender_id, recipient_id"),
+    client.from("profiles").select("id, username"),
+  ]);
+  if (friendships.error) throw friendships.error;
+  if (requests.error) throw requests.error;
+  if (profiles.error) throw profiles.error;
+  const username = (id: string) =>
+    profiles.data.find((p) => p.id === id)?.username;
+
+  return {
+    friends: friendships.data
+      .map((f) => username(f.user_a === userId ? f.user_b : f.user_a))
+      .sort(),
+    incoming: requests.data
+      .filter((r) => r.recipient_id === userId)
+      .map((r) => username(r.sender_id))
+      .sort(),
+    outgoing: requests.data
+      .filter((r) => r.sender_id === userId)
+      .map((r) => username(r.recipient_id))
+      .sort(),
+  };
+}
