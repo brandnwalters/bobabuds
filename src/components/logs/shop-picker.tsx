@@ -17,18 +17,22 @@ type Search =
 /**
  * Shop search box (an ARIA combobox). Suggestions come from `shopSearch()`:
  * Google Places when a key is configured, else the built-in fallback list.
- * Picking one fetches its details and hands them to `onChange`.
+ * Picking one fetches its details and hands them to `onChange`. While the box
+ * is focused and empty it lists `recentShops` instead; those already have
+ * their details, so picking one skips the search.
  */
 export function ShopPicker({
   id,
   value,
   onChange,
+  recentShops = [],
   invalid,
   describedBy,
 }: {
   id: string;
   value: ShopDetails | null;
   onChange: (shop: ShopDetails | null) => void;
+  recentShops?: ShopDetails[];
   invalid?: boolean;
   describedBy?: string;
 }) {
@@ -38,6 +42,7 @@ export function ShopPicker({
   const [search, setSearch] = useState<Search>({ status: "idle" });
   const [active, setActive] = useState(0);
   const [picking, setPicking] = useState(false);
+  const [showRecent, setShowRecent] = useState(false);
   const latest = useRef("");
 
   const trimmed = query.trim();
@@ -59,11 +64,25 @@ export function ShopPicker({
     return () => clearTimeout(timer);
   }, [trimmed]);
 
-  const results =
-    trimmed && search.status === "done" && search.query === trimmed ? search.results : [];
+  const recent = !trimmed && showRecent;
+  const results: ShopSuggestion[] = recent
+    ? recentShops.map((shop) => ({
+        placeId: shop.placeId,
+        name: shop.name,
+        detail: shop.formattedAddress,
+      }))
+    : trimmed && search.status === "done" && search.query === trimmed
+      ? search.results
+      : [];
   const open = results.length > 0 && !picking;
 
   async function pick(suggestion: ShopSuggestion) {
+    const known = recent && recentShops.find((s) => s.placeId === suggestion.placeId);
+    if (known) {
+      setShowRecent(false);
+      onChange(known);
+      return;
+    }
     setPicking(true);
     try {
       onChange(await shopSearch().details(suggestion));
@@ -125,7 +144,12 @@ export function ShopPicker({
         autoComplete="off"
         placeholder="Search for a boba shop"
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setActive(0);
+        }}
+        onFocus={() => setShowRecent(true)}
+        onBlur={() => setShowRecent(false)}
         onKeyDown={(event) => {
           if (!open) return;
           if (event.key === "ArrowDown") {
@@ -139,13 +163,14 @@ export function ShopPicker({
             void pick(results[active]);
           } else if (event.key === "Escape") {
             setQuery("");
+            setShowRecent(false);
           }
         }}
       />
       <ul
         id={listId}
         role="listbox"
-        aria-label="Shop suggestions"
+        aria-label={recent ? "Recent shops" : "Shop suggestions"}
         hidden={!open}
         className="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-auto rounded-xl border bg-card p-1 shadow-lg"
       >

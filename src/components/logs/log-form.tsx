@@ -3,6 +3,7 @@
 import { Plus, X } from "lucide-react";
 import { useActionState, useState, useSyncExternalStore } from "react";
 
+import { DrinkNameInput } from "@/components/logs/drink-name-input";
 import { ShopPicker } from "@/components/logs/shop-picker";
 import { StarRatingInput } from "@/components/logs/star-rating-input";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import {
   type IceLevel,
   type LogField,
 } from "@/lib/logs/fields";
+import type { LogSuggestions } from "@/lib/logs/suggestions";
 import type { ShopDetails } from "@/lib/places/types";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +41,12 @@ function useToday() {
 }
 
 /** The single-screen Log form, in spec order: shop, drink, rating, date, then the optional extras. */
-export function LogForm() {
+export function LogForm({
+  suggestions = { recentShops: [], drinksByPlaceId: {} },
+}: {
+  /** Recent shops and drink suggestions from the user's own Logs. */
+  suggestions?: LogSuggestions;
+}) {
   const [state, formAction, pending] = useActionState(createLog, initialState);
   const errors = state.errors;
 
@@ -53,6 +60,8 @@ export function LogForm() {
   const [toppings, setToppings] = useState<string[]>([]);
   const [customTopping, setCustomTopping] = useState("");
   const [note, setNote] = useState("");
+  const { recentShops, drinksByPlaceId } = suggestions;
+  const drinkSuggestions = (shop && drinksByPlaceId[shop.placeId]) || [];
 
   const errorProps = (field: LogField) =>
     errors[field]
@@ -88,6 +97,7 @@ export function LogForm() {
           id="shop"
           value={shop}
           onChange={setShop}
+          recentShops={recentShops}
           invalid={!!errors.shop && !shop}
           describedBy={errors.shop ? "shop-error" : undefined}
         />
@@ -97,14 +107,14 @@ export function LogForm() {
 
       <div className="space-y-2">
         <Label htmlFor="drinkName">Drink</Label>
-        <Input
+        <DrinkNameInput
           id="drinkName"
           name="drinkName"
           value={drinkName}
-          onChange={(event) => setDrinkName(event.target.value)}
+          onChange={setDrinkName}
+          suggestions={drinkSuggestions}
           maxLength={DRINK_NAME_MAX}
           placeholder="e.g. Brown sugar milk tea"
-          autoComplete="off"
           {...errorProps("drinkName")}
         />
         <FieldError field="drinkName" errors={errors} />
