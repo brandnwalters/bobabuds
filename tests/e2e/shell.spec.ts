@@ -6,7 +6,7 @@ const tabs = [
   { name: "Feed", path: "/", heading: "Feed" },
   { name: "Log", path: "/log", heading: "Log a drink" },
   { name: "Friends", path: "/friends", heading: "Friends" },
-  { name: "Profile", path: "/profile", heading: "Profile" },
+  { name: "Profile", path: "/profile", heading: "Sam Rivera" },
 ];
 
 test.beforeEach(async ({ page }) => {

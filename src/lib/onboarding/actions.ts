@@ -2,6 +2,9 @@
 
 import { redirect } from "next/navigation";
 
+import { removeImages } from "@/lib/images/storage";
+import { saveAvatar } from "@/lib/profiles/avatar-upload";
+import { AVATARS_BUCKET } from "@/lib/profiles/avatars";
 import {
   displayNameProblem,
   usernameProblem,
@@ -31,10 +34,13 @@ export async function checkUsername(username: string): Promise<UsernameCheck> {
 export type CreateProfileState = {
   username: string;
   displayName: string;
-  errors: { username?: string; displayName?: string; form?: string };
+  errors: { username?: string; displayName?: string; avatar?: string; form?: string };
 };
 
-/** Finishes onboarding: creates the signed-in user's profile, then opens the Feed. */
+/**
+ * Finishes onboarding: creates the signed-in user's profile (with an optional
+ * avatar), then opens the Feed.
+ */
 export async function createProfile(
   _previous: CreateProfileState,
   formData: FormData,
@@ -60,9 +66,17 @@ export async function createProfile(
   const userId = claims?.claims.sub;
   if (!userId) redirect("/sign-in");
 
-  const { error } = await supabase
-    .from("profiles")
-    .insert({ id: userId, username, display_name: displayName });
+  const avatar = await saveAvatar(supabase, userId, formData);
+  if (avatar.error) return { ...state, errors: { avatar: avatar.error } };
+
+  const { error } = await supabase.from("profiles").insert({
+    id: userId,
+    username,
+    display_name: displayName,
+    avatar_path: avatar.avatarPath ?? null,
+  });
+  // The upload is orphaned if the profile wasn't created.
+  if (error) await removeImages(supabase, AVATARS_BUCKET, [avatar.avatarPath]);
 
   if (error?.code === "23505") {
     // Unique violation: either the username went or the profile already exists.

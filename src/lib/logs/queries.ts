@@ -10,6 +10,7 @@ import { signedImageUrls } from "@/lib/images/storage";
 import type { IceLevel } from "@/lib/logs/fields";
 import { LOG_PHOTOS_BUCKET } from "@/lib/logs/photos";
 import type { ShopDetails } from "@/lib/places/types";
+import { signedAvatarUrls } from "@/lib/profiles/avatar-urls";
 import { createClient } from "@/lib/supabase/server";
 
 export type LogWithShop = {
@@ -124,15 +125,17 @@ export async function getViewerId(): Promise<string | null> {
   return (await supabase.auth.getClaims()).data?.claims.sub ?? null;
 }
 
-/** The signed-in user's own Logs, newest drink first. */
-export async function listMyLogs(): Promise<LogWithShop[]> {
+/**
+ * One user's Logs, newest drink first: all of them for the user themselves
+ * and their friends, none for anyone else (row-level security decides).
+ */
+export async function listLogsBy(authorId: string): Promise<LogWithShop[]> {
+  if (!UUID.test(authorId)) return [];
   const supabase = await createClient();
-  const userId = (await supabase.auth.getClaims()).data?.claims.sub;
-  if (!userId) return [];
   const { data, error } = await supabase
     .from("logs")
     .select(LOG_COLUMNS)
-    .eq("author_id", userId)
+    .eq("author_id", authorId)
     .order("drank_on", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
@@ -150,6 +153,8 @@ export type FeedLog = LogWithPhoto & WithCheers & {
     username: string;
     displayName: string;
     avatarPath: string | null;
+    /** Short-lived signed URL of the author's avatar (null without one). */
+    avatarUrl: string | null;
   };
 };
 
@@ -174,7 +179,8 @@ type FeedRow = LogRow & {
 };
 
 /**
- * Maps FEED_COLUMNS rows, signing their photos in one request; shared by the
+ * Maps FEED_COLUMNS rows, signing their photos and author avatars in one
+ * request each; shared by the
  * Feed and the Shop Page. `viewerId` (the signed-in user) decides whether the
  * viewer has cheered.
  */
@@ -183,11 +189,17 @@ async function toFeedLogs(
   rows: FeedRow[],
   viewerId: string | null,
 ): Promise<FeedLog[]> {
-  const photoUrls = await signedImageUrls(
-    supabase,
-    LOG_PHOTOS_BUCKET,
-    rows.map((row) => row.photo_path),
-  );
+  const [photoUrls, avatarUrls] = await Promise.all([
+    signedImageUrls(
+      supabase,
+      LOG_PHOTOS_BUCKET,
+      rows.map((row) => row.photo_path),
+    ),
+    signedAvatarUrls(
+      supabase,
+      rows.map((row) => row.author.avatar_path),
+    ),
+  ]);
   return rows.map((row) => ({
     ...withPhotoUrl(toLog(row), photoUrls),
     author: {
@@ -195,6 +207,8 @@ async function toFeedLogs(
       username: row.author.username,
       displayName: row.author.display_name,
       avatarPath: row.author.avatar_path,
+      avatarUrl:
+        (row.author.avatar_path && avatarUrls.get(row.author.avatar_path)) || null,
     },
     cheers: toCheers(row.cheers, viewerId),
   }));
