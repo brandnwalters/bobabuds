@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-import { magicLinkFor, newEmail, signInAsNewUser } from "./support/supabase";
+import { signInAs } from "./support/dev-sign-in";
+import { LOCAL_ONLY, magicLinkFor, newEmail } from "./support/supabase";
 
 test("a signed-in user can sign out", async ({ page }) => {
-  await signInAsNewUser(page);
-  await page.goto("/profile");
+  await signInAs(page, "priya", { next: "/profile" });
 
   await page.getByRole("button", { name: "Sign out" }).click();
 
@@ -25,6 +25,7 @@ test("a signed-out visitor is sent to sign-in", async ({ page }) => {
 test("a new visitor signs up with an emailed magic link and lands on setup", async ({
   page,
 }) => {
+  test.skip(...LOCAL_ONLY);
   const email = newEmail();
   await page.goto("/sign-in");
 
