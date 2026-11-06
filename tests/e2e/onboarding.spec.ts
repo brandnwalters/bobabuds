@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-import { adminClient, newUsername, signInAsNewUser } from "./support/supabase";
+import {
+  adminClient,
+  LOCAL_ONLY,
+  newUsername,
+  signInAsNewUser,
+} from "./support/supabase";
+
+test.skip(...LOCAL_ONLY);
 
 test("a signed-in user without a username is sent back to setup", async ({
   page,

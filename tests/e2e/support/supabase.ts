@@ -4,6 +4,16 @@ import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
+/**
+ * These helpers read keys from the local Supabase stack, so tests using them
+ * can't run against a deployed app. Use `test.skip(...LOCAL_ONLY)` in them.
+ * Prefer `signInAs` (./dev-sign-in) with a seeded user where possible.
+ */
+export const LOCAL_ONLY = [
+  !!process.env.E2E_BASE_URL,
+  "needs the local Supabase stack (not available with E2E_BASE_URL)",
+] as const;
+
 type LocalSupabase = { url: string; secretKey: string; mailpitUrl: string };
 
 let cached: LocalSupabase | undefined;

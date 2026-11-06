@@ -14,6 +14,7 @@ pnpm install
 pnpm exec playwright install chromium   # browser for the e2e tests
 cp .env.example .env.local              # local Supabase defaults
 pnpm db:start                           # local Supabase in Docker (first run pulls images)
+pnpm seed                               # reset the database and load the seeded users
 pnpm dev                                # http://localhost:3000
 ```
 
@@ -31,11 +32,32 @@ emails) at http://127.0.0.1:54324. Stop the stack with `pnpm db:stop`.
 | `pnpm test:e2e`    | Playwright browser tests (starts `pnpm dev` if needed)       |
 | `pnpm test:access` | Access-rule tests against the local Supabase (needs `db:start`) |
 | `pnpm db:start`    | Start the local Supabase stack                               |
+| `pnpm seed`        | Reset the local database, then create the seeded users       |
 | `pnpm db:reset`    | Recreate the local database and apply all migrations         |
 | `pnpm db:status`   | Show local Supabase URLs and keys                            |
 
 The Supabase CLI is a dev dependency, so run any other command with
 `pnpm exec supabase <command>`.
+
+## Seeded users and the Dev Bar
+
+`pnpm seed` resets the local database and creates the seeded users (listed in
+`src/lib/dev/seed-users.ts`): `@mia` (the main test user), `@jordan`,
+`@priya`, `@sam`, `@alex`, `@taylor` and `@casey`.
+
+With `DEV_TOOLS=true` (set in `.env.example`), every page shows the **Dev Bar**,
+a floating purple button in the bottom-right corner. Open it and choose a
+seeded user to sign in as them, no email needed. Switching creates a real
+session, so the app then behaves exactly as it would for that user.
+
+The Dev Bar uses the dev-only route `/auth/dev-sign-in?as=<username>&next=<path>`,
+which signs in with the service-role key. It returns 404 unless
+`DEV_TOOLS=true`, and 403 for any account that isn't a seeded user.
+
+`pnpm seed --linked` passes `--linked` to `supabase db reset`, to seed a hosted
+project that holds only seed data (set `NEXT_PUBLIC_SUPABASE_URL` and
+`SUPABASE_SECRET_KEY` to that project's values). Never point it at production:
+it wipes the database.
 
 ## Database migrations
 
@@ -49,12 +71,15 @@ pnpm exec supabase migration new <name>
 ## Tests
 
 - **Browser tests** (`tests/e2e/`, Playwright) drive the running app on a
-  mobile and a desktop viewport. Set `E2E_BASE_URL` to test an already-running
-  app, such as a Vercel preview, or `E2E_PORT` to change the dev server port.
+  mobile and a desktop viewport. They sign in as seeded users through the Dev
+  Bar route, so run `pnpm seed` first. Set `E2E_BASE_URL` to test an
+  already-running app, such as a Vercel preview with dev tools on (tests that
+  need the local Supabase stack are skipped there), or `E2E_PORT` to change the
+  dev server port.
 - **Access-rule tests** (`tests/access/`, Vitest) sign in to the local Supabase
   as different users and attempt direct reads and writes, to check row-level
   security. They read the local URL and keys from `supabase status`, so no env
-  file is needed.
+  file is needed. Run `pnpm seed` first: they sign in as seeded users.
 
 ## Deployment (manual, one-time)
 

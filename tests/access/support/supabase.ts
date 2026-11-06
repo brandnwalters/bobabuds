@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { createClient, type User } from "@supabase/supabase-js";
 import { inject } from "vitest";
 
+import { seededEmail, type SeededUsername } from "@/lib/dev/seed-users";
+
 const clientOptions = {
   auth: { persistSession: false, autoRefreshToken: false },
 } as const;
@@ -47,4 +49,29 @@ export async function signInAsNewUser(): Promise<{
   });
   if (error) throw error;
   return signInAs(email, password);
+}
+
+/**
+ * Returns a client signed in as a seeded user (needs `pnpm seed`), the same
+ * way the Dev Bar does it: an admin-generated magic-link token, verified
+ * without email. Requests from the client run under row-level security.
+ */
+export async function signInAsSeeded(username: SeededUsername) {
+  const { data: link, error: linkError } =
+    await adminClient().auth.admin.generateLink({
+      type: "magiclink",
+      email: seededEmail(username),
+    });
+  if (linkError) throw linkError;
+  if (link.user.app_metadata.seeded !== true) {
+    throw new Error(`@${username} is not seeded. Run \`pnpm seed\` first.`);
+  }
+
+  const client = anonClient();
+  const { data, error } = await client.auth.verifyOtp({
+    token_hash: link.properties.hashed_token,
+    type: "magiclink",
+  });
+  if (error) throw error;
+  return { client, user: data.user! };
 }
