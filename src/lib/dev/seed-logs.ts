@@ -54,6 +54,8 @@ export const SEEDED_LOGS: SeededLog[] = [
   { author: "sam", shop: "Cha House", drink: "Thai Milk Tea", rating: 3, daysAgo: 20, sweetness: 100, ice: "regular", toppings: ["Boba"] },
   { author: "sam", shop: "Yaya Tea", drink: "Mango Slush", rating: 4.5, daysAgo: 29, sweetness: 75, ice: "regular", toppings: ["Mini boba", "Pudding"] },
   { author: "sam", shop: "Chill Bubble Tea", drink: "Red Bean Milk Tea", rating: 3.5, daysAgo: 38, sweetness: 50, toppings: ["Red bean"] },
+  // A custom (non-preset) topping, and no sweetness or ice.
+  { author: "sam", shop: "Yaya Tea Durham", drink: "Hokkaido Milk Tea", rating: 4, daysAgo: 26, toppings: ["Boba", "Brûlée top"], note: "Ask for the torched sugar top." },
 
   // alex: sent mia a friend request (not her friend yet)
   { author: "alex", shop: "Yaya Tea", drink: "Lavender Milk Tea", rating: 4, daysAgo: 2, sweetness: 50, ice: "less", note: "Floral but not soapy." },

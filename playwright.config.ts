@@ -15,6 +15,14 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL,
+    // Vercel Deployment Protection on previews: pass the project's
+    // "Protection Bypass for Automation" secret to get through it.
+    extraHTTPHeaders: process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+      ? {
+          "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+          "x-vercel-set-bypass-cookie": "samesitenone",
+        }
+      : undefined,
     trace: "on-first-retry",
   },
   projects: [

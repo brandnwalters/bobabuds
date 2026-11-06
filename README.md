@@ -32,7 +32,7 @@ emails) at http://127.0.0.1:54324. Stop the stack with `pnpm db:stop`.
 | `pnpm test:e2e`    | Playwright browser tests (starts `pnpm dev` if needed)       |
 | `pnpm test:access` | Access-rule tests against the local Supabase (needs `db:start`) |
 | `pnpm db:start`    | Start the local Supabase stack                               |
-| `pnpm seed`        | Reset the local database, then create the seeded users       |
+| `pnpm seed`        | Reset the local database, then load the seed data            |
 | `pnpm db:reset`    | Recreate the local database and apply all migrations         |
 | `pnpm db:status`   | Show local Supabase URLs and keys                            |
 
@@ -41,18 +41,52 @@ The Supabase CLI is a dev dependency, so run any other command with
 
 ## Seeded users and the Dev Bar
 
-`pnpm seed` resets the local database and creates the seeded users (listed in
-`src/lib/dev/seed-users.ts`): `@mia` (the main test user), `@jordan`,
-`@priya`, `@sam`, `@alex`, `@taylor` and `@casey`.
+`pnpm seed` resets the local database and loads:
+
+- **7 seeded users** with avatars (except `@taylor`, who shows the initials
+  fallback), listed in `src/lib/dev/seed-users.ts`.
+- **Every relationship state**, relative to the main test user `@mia`:
+  | User      | Relation to @mia                                   |
+  | --------- | -------------------------------------------------- |
+  | `@jordan` | friend (also friends with `@priya`)                |
+  | `@priya`  | friend                                             |
+  | `@sam`    | friend                                             |
+  | `@alex`   | sent mia a Friend Request (incoming for mia)       |
+  | `@taylor` | mia sent them a Friend Request (outgoing for mia)  |
+  | `@casey`  | stranger: no connection to anyone                  |
+- **7 real Chapel Hill/Durham shops** (`src/lib/places/fallback.ts`).
+- **40 Logs** spread over the last six weeks, by every user, with varied
+  sweetness, ice, preset and custom toppings and notes
+  (`src/lib/dev/seed-logs.ts`); 4 in 5 have a placeholder drink photo.
+- **17 Cheers**, always from friends of the author
+  (`src/lib/dev/seed-cheers.ts`).
 
 With `DEV_TOOLS=true` (set in `.env.example`), every page shows the **Dev Bar**,
 a floating purple button in the bottom-right corner. Open it and choose a
 seeded user to sign in as them, no email needed. Switching creates a real
-session, so the app then behaves exactly as it would for that user.
+session, so the app then behaves exactly as it would for that user. The
+**New user** entry creates a fresh account (no profile yet) and signs in as it,
+so you land on the setup screen; use it to try onboarding without email.
 
-The Dev Bar uses the dev-only route `/auth/dev-sign-in?as=<username>&next=<path>`,
-which signs in with the service-role key. It returns 404 unless
-`DEV_TOOLS=true`, and 403 for any account that isn't a seeded user.
+The Dev Bar uses the dev-only route `/auth/dev-sign-in?as=<username>&next=<path>`
+(or `?as=new`), which signs in with the service-role key. It returns 404
+unless `DEV_TOOLS=true`, and 403 for any account that isn't a seeded user.
+
+### Checking the privacy rules by hand
+
+After `pnpm seed`, use the Dev Bar to switch between users and check that:
+
+- `@mia`'s Feed shows her own Logs and jordan's, priya's and sam's, never
+  alex's, taylor's or casey's.
+- On `/friends`, mia has alex's request to accept or decline, a pending
+  request to taylor she can cancel, and three friends.
+- `/u/casey` (as mia) shows only casey's name, avatar and **Add friend**;
+  `/u/jordan` shows the full journal (stats and Logs).
+- A Shop Page (e.g. Moge Tee) lists only the Logs the current user can see,
+  and its average covers only those.
+- `@casey`'s Feed shows only casey's own Logs.
+- Edit and Delete appear only on your own Logs; Cheers only on Logs you can
+  see.
 
 `pnpm seed --linked` passes `--linked` to `supabase db reset`, to seed a hosted
 project that holds only seed data (set `NEXT_PUBLIC_SUPABASE_URL` and
@@ -105,6 +139,38 @@ pnpm exec supabase migration new <name>
   as different users and attempt direct reads and writes, to check row-level
   security. They read the local URL and keys from `supabase status`, so no env
   file is needed. Run `pnpm seed` first: they sign in as seeded users.
+
+### Verifying the MVP
+
+1. `pnpm lint && pnpm typecheck`
+2. `pnpm seed`, then `pnpm test:access` (the full access-rule suite) and
+   `pnpm test:e2e`.
+3. The **core loop** (`tests/e2e/core-loop.spec.ts`) walks the whole MVP in
+   one test: a New user from the Dev Bar finishes setup, sends `@sam` a Friend
+   Request that sam accepts, logs a drink with a photo, sam sees it in his
+   Feed and cheers it, the author edits it, the Profile shows the journal to
+   the author and sam but not to stranger `@casey`, the Shop Page lists it,
+   then the author deletes it and unfriends sam. It talks only to the app
+   (Dev Bar route + seeded users), so it also runs against a preview:
+
+   ```sh
+   E2E_BASE_URL=https://<preview>.vercel.app pnpm test:e2e core-loop
+   ```
+
+   The preview needs:
+   - `DEV_TOOLS=true` and a Supabase project that holds **only seed data**,
+     seeded with `pnpm seed --linked` (see above). The test leaves the seed
+     data as it found it, apart from one new `loop_*` account per run.
+   - **No** `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in the Preview environment, so
+     the shop picker uses the built-in shop list the tests pick from.
+   - If Vercel Deployment Protection is on, set
+     `VERCEL_AUTOMATION_BYPASS_SECRET` to the project's "Protection Bypass
+     for Automation" secret when running the command.
+
+   Running the whole suite against a preview works the same way; tests that
+   need the local Supabase stack skip themselves there.
+4. By hand: use the Dev Bar on the preview to switch between seeded users and
+   run through [Checking the privacy rules by hand](#checking-the-privacy-rules-by-hand).
 
 ## Deployment (manual, one-time)
 
