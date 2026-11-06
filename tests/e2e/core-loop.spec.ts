@@ -75,7 +75,7 @@ test("core loop: setup, befriend, log with a photo, Feed, Cheers, edit, Profile,
   await page.goto("/sign-in");
   const devBar = page.getByRole("complementary", { name: "Dev Bar" });
   await devBar.locator("summary").click();
-  await devBar.getByRole("link", { name: /New user/ }).click();
+  await devBar.getByRole("button", { name: /New user/ }).click();
   await expect(page).toHaveURL(/\/onboarding$/);
   // Retry the fill: typing before the form hydrates is lost (and React then
   // ignores a refill with the same value, so clear it first).

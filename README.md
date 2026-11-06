@@ -69,7 +69,7 @@ session, so the app then behaves exactly as it would for that user. The
 so you land on the setup screen; use it to try onboarding without email.
 
 The Dev Bar uses the dev-only route `/auth/dev-sign-in?as=<username>&next=<path>`
-(or `?as=new`), which signs in with the service-role key. It returns 404
+(or a POST to `?as=new`), which signs in with the service-role key. It returns 404
 unless `DEV_TOOLS=true`, and 403 for any account that isn't a seeded user.
 
 ### Checking the privacy rules by hand
@@ -96,10 +96,12 @@ it wipes the database.
 ## Google Places key
 
 The Log form searches for shops with Google Places Autocomplete in the
-browser, using `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`. Without a key, it searches a
-built-in list of real Chapel Hill/Durham shops (`src/lib/places/fallback.ts`)
-instead. The browser tests rely on that list, so run them without a key. Shops
-from the list get `dev-fallback:` place IDs, not real Google ones.
+browser, using `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`. Without a key, and only
+when `DEV_TOOLS=true`, it searches a built-in list of real Chapel Hill/Durham
+shops (`src/lib/places/fallback.ts`) instead; without a key or dev tools, shop
+search is unavailable. The browser tests rely on that list, so run them
+without a key. Shops from the list get `dev-fallback:` place IDs, not real
+Google ones.
 
 To use real autocomplete:
 
@@ -114,9 +116,17 @@ To use real autocomplete:
 3. Set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in `.env.local` and in Vercel
    (Production and Preview). It's read at build time, so redeploy after you
    change it.
+4. Users can't add shops directly. The first time someone logs at a place, the
+   server fetches its details by place ID (Place Details, Places API (New))
+   and stores them. Server requests have no browser referrer, so create a
+   second key restricted to Places API (New) only and set it as
+   `GOOGLE_PLACES_SERVER_KEY` (server-only, never `NEXT_PUBLIC_`) in
+   `.env.local` and Vercel. Without it the server tries the browser key.
 
 At MVP scale, usage should stay within Google's free tier. One search plus the
-place-details call when a shop is picked is billed as one autocomplete session.
+place-details call when a shop is picked is billed as one autocomplete session;
+the server's details call for a shop nobody has logged at yet is billed
+separately.
 
 ## Database migrations
 

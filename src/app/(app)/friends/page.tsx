@@ -16,9 +16,9 @@ import {
 import {
   getFriendsOverview,
   searchBuds,
-  type Bud,
   type Relationship,
 } from "@/lib/friends/queries";
+import type { Bud } from "@/lib/profiles/people";
 
 export const metadata: Metadata = { title: "Friends · Boba Buds" };
 

@@ -4,18 +4,10 @@ import { connection } from "next/server";
 import { cache } from "react";
 
 import { withAvatarUrls } from "@/lib/profiles/avatar-urls";
-import { USERNAME_MAX } from "@/lib/profiles/validation";
-import { createClient } from "@/lib/supabase/server";
-
-/** The basic, public profile fields shown wherever a person is listed. */
-export type Bud = {
-  id: string;
-  username: string;
-  displayName: string;
-  avatarPath: string | null;
-  /** Short-lived signed URL of the avatar (null without one). */
-  avatarUrl: string | null;
-};
+import { BUD_COLUMNS, type Bud, type ProfileRow, toBud } from "@/lib/profiles/people";
+import { USERNAME_PREFIX } from "@/lib/profiles/validation";
+import { createClient, getViewerId } from "@/lib/supabase/server";
+import { UUID } from "@/lib/uuid";
 
 /**
  * Where the viewer stands with another user: `incoming` means they sent the
@@ -25,30 +17,12 @@ export type Relationship = "self" | "friends" | "incoming" | "outgoing" | "none"
 
 export const SEARCH_LIMIT = 10;
 
-const BUD_COLUMNS = "id, username, display_name, avatar_path";
-
-type ProfileRow = {
-  id: string;
-  username: string;
-  display_name: string;
-  avatar_path: string | null;
-};
-
-function toBud(row: ProfileRow): Omit<Bud, "avatarUrl"> {
-  return {
-    id: row.id,
-    username: row.username,
-    displayName: row.display_name,
-    avatarPath: row.avatar_path,
-  };
-}
-
 async function viewer() {
   // Per-user data, read at request time (the session check reads the clock,
   // which Next won't allow while prerendering).
   await connection();
   const supabase = await createClient();
-  const userId = (await supabase.auth.getClaims()).data?.claims.sub;
+  const userId = await getViewerId(supabase);
   if (!userId) throw new Error("Not signed in");
   return { supabase, userId };
 }
@@ -123,7 +97,7 @@ export async function searchBuds(
 ): Promise<(Bud & { relationship: Relationship })[]> {
   const prefix = query.trim().replace(/^@/, "");
   // Usernames only use these characters, so anything else matches nobody.
-  if (!new RegExp(`^[A-Za-z0-9_]{1,${USERNAME_MAX}}$`).test(prefix)) return [];
+  if (!USERNAME_PREFIX.test(prefix)) return [];
 
   const { supabase, userId } = await viewer();
   const { data, error } = await supabase
@@ -149,8 +123,6 @@ export async function searchBuds(
 export async function relationshipWith(otherId: string): Promise<Relationship> {
   return (await relationshipsWith([otherId])).get(otherId) ?? "none";
 }
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function relationshipsWith(candidateIds: string[]) {
   const result = new Map<string, Relationship>();

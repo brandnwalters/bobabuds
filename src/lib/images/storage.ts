@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { readImageChoice } from "@/lib/images/upload";
+
 /**
  * Image uploads, server half: store, remove and sign images in a private
  * Storage bucket whose objects live under `<owner id>/` (the bucket's
@@ -68,4 +70,49 @@ export async function signedImageUrls(
     if (item.path && item.signedUrl && !item.error) urls.set(item.path, item.signedUrl);
   }
   return urls;
+}
+
+/** The signed URL for `path` from `signedImageUrls`, or null (no image, or unsigned). */
+export function signedUrlFor(
+  urls: Map<string, string>,
+  path: string | null,
+): string | null {
+  return (path && urls.get(path)) || null;
+}
+
+/**
+ * Reads an image picker's choice from form field `field` and uploads a new
+ * image into `ownerId`'s folder. `path` is the column value to save: a new
+ * path, null to remove the image, or undefined to leave it alone.
+ * `uploadError` is the message shown when the upload fails.
+ */
+export async function saveImageChoice(
+  supabase: SupabaseClient,
+  {
+    bucket,
+    ownerId,
+    formData,
+    field,
+    uploadError,
+  }: {
+    bucket: string;
+    ownerId: string;
+    formData: FormData;
+    field: string;
+    uploadError: string;
+  },
+): Promise<{ path?: string | null; error?: string }> {
+  const choice = readImageChoice(formData, field);
+  switch (choice.status) {
+    case "invalid":
+      return { error: choice.error };
+    case "unchanged":
+      return {};
+    case "removed":
+      return { path: null };
+    case "new": {
+      const path = await uploadImage(supabase, bucket, ownerId, choice.file);
+      return path ? { path } : { error: uploadError };
+    }
+  }
 }

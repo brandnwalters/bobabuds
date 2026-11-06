@@ -2,10 +2,16 @@ import "server-only";
 
 import { connection } from "next/server";
 
-import { type Bud, type Relationship, relationshipWith } from "@/lib/friends/queries";
+import { type Relationship, relationshipWith } from "@/lib/friends/queries";
 import { listLogsBy, type LogWithShop } from "@/lib/logs/queries";
 import { withAvatarUrls } from "@/lib/profiles/avatar-urls";
-import { createClient } from "@/lib/supabase/server";
+import { BUD_COLUMNS, type Bud, type ProfileRow, toBud } from "@/lib/profiles/people";
+import { USERNAME } from "@/lib/profiles/validation";
+import {
+  createClient,
+  getViewerId,
+  type ServerSupabase,
+} from "@/lib/supabase/server";
 
 /** A Profile's boba stats, over every Log on it. */
 export type ProfileStats = {
@@ -24,8 +30,6 @@ export type ProfileView =
   | { view: "full"; person: Bud; relationship: Relationship; stats: ProfileStats; logs: LogWithShop[] }
   | { view: "limited"; person: Bud; relationship: Relationship };
 
-const USERNAME = /^[A-Za-z0-9_]{3,20}$/;
-
 /** The Profile of `username` (any case) for the signed-in viewer, or null. */
 export async function getProfile(username: string): Promise<ProfileView | null> {
   if (!USERNAME.test(username)) return null;
@@ -34,10 +38,10 @@ export async function getProfile(username: string): Promise<ProfileView | null> 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_path")
+    .select(BUD_COLUMNS)
     // Usernames are unique case-insensitively; escape `_` for ilike.
     .ilike("username", username.replaceAll("_", "\\_"))
-    .maybeSingle();
+    .maybeSingle<ProfileRow>();
   if (error) throw error;
   return data ? profileView(supabase, data) : null;
 }
@@ -46,30 +50,23 @@ export async function getProfile(username: string): Promise<ProfileView | null> 
 export async function getMyProfile(): Promise<ProfileView | null> {
   await connection();
   const supabase = await createClient();
-  const userId = (await supabase.auth.getClaims()).data?.claims.sub;
+  const userId = await getViewerId(supabase);
   if (!userId) return null;
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_path")
+    .select(BUD_COLUMNS)
     .eq("id", userId)
-    .maybeSingle();
+    .maybeSingle<ProfileRow>();
   if (error) throw error;
   return data ? profileView(supabase, data) : null;
 }
 
 async function profileView(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  row: { id: string; username: string; display_name: string; avatar_path: string | null },
+  supabase: ServerSupabase,
+  row: ProfileRow,
 ): Promise<ProfileView> {
   const [[person], relationship] = await Promise.all([
-    withAvatarUrls(supabase, [
-      {
-        id: row.id,
-        username: row.username,
-        displayName: row.display_name,
-        avatarPath: row.avatar_path,
-      },
-    ]),
+    withAvatarUrls(supabase, [toBud(row)]),
     relationshipWith(row.id),
   ]);
   if (relationship !== "self" && relationship !== "friends") {

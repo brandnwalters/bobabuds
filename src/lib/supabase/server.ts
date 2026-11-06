@@ -32,3 +32,11 @@ export async function createClient() {
     },
   });
 }
+
+/** The Supabase client `createClient()` returns. */
+export type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
+
+/** The signed-in user's id, or null when signed out. */
+export async function getViewerId(supabase: ServerSupabase): Promise<string | null> {
+  return (await supabase.auth.getClaims()).data?.claims.sub ?? null;
+}

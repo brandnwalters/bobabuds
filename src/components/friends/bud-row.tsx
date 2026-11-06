@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Avatar } from "@/components/profiles/avatar";
-import type { Bud } from "@/lib/friends/queries";
+import type { Bud } from "@/lib/profiles/people";
 
 /**
  * One person in a Friends page list: avatar, display name (linking to their

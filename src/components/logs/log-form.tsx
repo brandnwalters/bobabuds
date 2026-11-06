@@ -23,7 +23,7 @@ import {
   type IceLevel,
   type LogField,
 } from "@/lib/logs/fields";
-import { PHOTO_MAX_EDGE } from "@/lib/logs/photos";
+import { LOG_PHOTO_FIELD, PHOTO_MAX_EDGE } from "@/lib/logs/photos";
 import type { LogWithPhoto } from "@/lib/logs/queries";
 import type { LogSuggestions } from "@/lib/logs/suggestions";
 import type { ShopDetails } from "@/lib/places/types";
@@ -49,13 +49,17 @@ function useToday() {
  * the optional extras. Without `log` it creates a Log; with `log` it starts
  * from that Log's values and saves over it. `suggestions` (recent shops and
  * drink names from the user's own Logs) power the shop and drink shortcuts.
+ * `builtInShops` lets the shop search use the built-in list when there's no
+ * Google key; pass `devToolsEnabled()`.
  */
 export function LogForm({
   log,
   suggestions = { recentShops: [], drinksByPlaceId: {} },
+  builtInShops = false,
 }: {
   log?: LogWithPhoto;
   suggestions?: LogSuggestions;
+  builtInShops?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
     log ? updateLog.bind(null, log.id) : createLog,
@@ -109,7 +113,7 @@ export function LogForm({
     <form
       // The photo lives in state (React resets file inputs after an action).
       action={(formData) => {
-        setImageChoice(formData, "photo", photo);
+        setImageChoice(formData, LOG_PHOTO_FIELD, photo);
         formAction(formData);
       }}
       className="space-y-6"
@@ -122,6 +126,7 @@ export function LogForm({
           value={shop}
           onChange={setShop}
           recentShops={recentShops}
+          builtInShops={builtInShops}
           invalid={!!errors.shop && !shop}
           describedBy={errors.shop ? `${formId}-shop-error` : undefined}
         />

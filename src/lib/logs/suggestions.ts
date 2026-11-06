@@ -1,7 +1,8 @@
 import "server-only";
 
 import type { ShopDetails } from "@/lib/places/types";
-import { createClient } from "@/lib/supabase/server";
+import { SHOP_COLUMNS, type ShopRow, toShop } from "@/lib/shops/columns";
+import { createClient, getViewerId } from "@/lib/supabase/server";
 
 /** The Log form's shortcuts, from the signed-in user's own Logs. */
 export type LogSuggestions = {
@@ -18,17 +19,7 @@ const DRINKS_PER_SHOP_MAX = 8;
 /** How many of the newest Logs to scan; plenty for short shortcut lists. */
 const SCAN_LIMIT = 500;
 
-type Row = {
-  drink_name: string;
-  shop: {
-    place_id: string;
-    name: string;
-    formatted_address: string;
-    latitude: number;
-    longitude: number;
-    google_maps_url: string;
-  };
-};
+type Row = { drink_name: string; shop: ShopRow };
 
 /**
  * Recent shops and per-shop drink suggestions, in one query. Scoped to the
@@ -37,13 +28,11 @@ type Row = {
  */
 export async function getLogSuggestions(): Promise<LogSuggestions> {
   const supabase = await createClient();
-  const userId = (await supabase.auth.getClaims()).data?.claims.sub;
+  const userId = await getViewerId(supabase);
   if (!userId) return NO_SUGGESTIONS;
   const { data, error } = await supabase
     .from("logs")
-    .select(
-      "drink_name, shop:shops!inner(place_id, name, formatted_address, latitude, longitude, google_maps_url)",
-    )
+    .select(`drink_name, shop:shops!inner(${SHOP_COLUMNS})`)
     .eq("author_id", userId)
     .order("drank_on", { ascending: false })
     .order("created_at", { ascending: false })
@@ -58,16 +47,7 @@ export async function getLogSuggestions(): Promise<LogSuggestions> {
     let drinks = drinksByPlaceId[shop.place_id];
     if (!drinks) {
       drinks = drinksByPlaceId[shop.place_id] = [];
-      if (recentShops.length < RECENT_SHOPS_MAX) {
-        recentShops.push({
-          placeId: shop.place_id,
-          name: shop.name,
-          formattedAddress: shop.formatted_address,
-          latitude: shop.latitude,
-          longitude: shop.longitude,
-          googleMapsUrl: shop.google_maps_url,
-        });
-      }
+      if (recentShops.length < RECENT_SHOPS_MAX) recentShops.push(toShop(shop));
     }
     if (
       drinks.length < DRINKS_PER_SHOP_MAX &&

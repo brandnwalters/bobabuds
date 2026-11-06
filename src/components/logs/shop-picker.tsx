@@ -16,16 +16,18 @@ type Search =
 
 /**
  * Shop search box (an ARIA combobox). Suggestions come from `shopSearch()`:
- * Google Places when a key is configured, else the built-in fallback list.
- * Picking one fetches its details and hands them to `onChange`. While the box
- * is focused and empty it lists `recentShops` instead; those already have
- * their details, so picking one skips the search.
+ * Google Places when a key is configured, else the built-in fallback list
+ * when `builtInShops` (dev tools on). Picking one fetches its details and
+ * hands them to `onChange`. While the box is focused and empty it lists
+ * `recentShops` instead; those already have their details, so picking one
+ * skips the search.
  */
 export function ShopPicker({
   id,
   value,
   onChange,
   recentShops = [],
+  builtInShops = false,
   invalid,
   describedBy,
 }: {
@@ -33,6 +35,7 @@ export function ShopPicker({
   value: ShopDetails | null;
   onChange: (shop: ShopDetails | null) => void;
   recentShops?: ShopDetails[];
+  builtInShops?: boolean;
   invalid?: boolean;
   describedBy?: string;
 }) {
@@ -52,7 +55,7 @@ export function ShopPicker({
     const timer = setTimeout(async () => {
       setSearch({ status: "searching", query: trimmed });
       try {
-        const results = await shopSearch().suggest(trimmed);
+        const results = await shopSearch({ builtInShops }).suggest(trimmed);
         if (latest.current === trimmed) {
           setSearch({ status: "done", query: trimmed, results });
           setActive(0);
@@ -62,7 +65,7 @@ export function ShopPicker({
       }
     }, 200);
     return () => clearTimeout(timer);
-  }, [trimmed]);
+  }, [trimmed, builtInShops]);
 
   const recent = !trimmed && showRecent;
   const results: ShopSuggestion[] = recent
@@ -85,7 +88,7 @@ export function ShopPicker({
     }
     setPicking(true);
     try {
-      onChange(await shopSearch().details(suggestion));
+      onChange(await shopSearch({ builtInShops }).details(suggestion));
       setQuery("");
       setSearch({ status: "idle" });
     } catch {

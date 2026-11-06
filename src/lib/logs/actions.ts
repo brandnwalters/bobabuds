@@ -2,16 +2,17 @@
 
 import { redirect } from "next/navigation";
 
-import { removeImages, uploadImage } from "@/lib/images/storage";
-import { readImageChoice } from "@/lib/images/upload";
+import { removeImages, saveImageChoice } from "@/lib/images/storage";
 import { type LogInput, parseLogForm, type LogErrors } from "@/lib/logs/fields";
-import { LOG_PHOTOS_BUCKET } from "@/lib/logs/photos";
-import { upsertShop } from "@/lib/shops/upsert";
-import { createClient } from "@/lib/supabase/server";
+import { LOG_PHOTO_UPLOAD, LOG_PHOTOS_BUCKET } from "@/lib/logs/photos";
+import { findOrAddShop } from "@/lib/shops/find-or-add";
+import {
+  createClient,
+  getViewerId,
+  type ServerSupabase,
+} from "@/lib/supabase/server";
 
 export type LogFormState = { errors: LogErrors };
-
-type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 /** The logs columns a form submission sets (shop already resolved to its id). */
 function logColumns(input: LogInput, shopId: string) {
@@ -27,35 +28,8 @@ function logColumns(input: LogInput, shopId: string) {
   };
 }
 
-/**
- * Reads the form's photo field and uploads a new photo into the user's
- * folder. `photoPath` is the column value to save: a new path, null to
- * remove the photo, or undefined to leave it alone.
- */
-async function savePhoto(
-  supabase: Supabase,
-  userId: string,
-  formData: FormData,
-): Promise<{ photoPath?: string | null; error?: string }> {
-  const choice = readImageChoice(formData, "photo");
-  switch (choice.status) {
-    case "invalid":
-      return { error: choice.error };
-    case "unchanged":
-      return {};
-    case "removed":
-      return { photoPath: null };
-    case "new": {
-      const path = await uploadImage(supabase, LOG_PHOTOS_BUCKET, userId, choice.file);
-      return path
-        ? { photoPath: path }
-        : { error: "We couldn't upload your photo. Try again." };
-    }
-  }
-}
-
-async function signedInUser(supabase: Supabase, next: string) {
-  const userId = (await supabase.auth.getClaims()).data?.claims.sub;
+async function signedInUser(supabase: ServerSupabase, next: string) {
+  const userId = await getViewerId(supabase);
   if (!userId) redirect(`/sign-in?next=${encodeURIComponent(next)}`);
   return userId;
 }
@@ -71,12 +45,16 @@ export async function createLog(
   const supabase = await createClient();
   const userId = await signedInUser(supabase, "/log");
 
-  const shopId = await upsertShop(supabase, input.shop);
+  const shopId = await findOrAddShop(input.shop.placeId);
   if (!shopId) {
     return { errors: { form: "We couldn't save that shop. Try again." } };
   }
 
-  const photo = await savePhoto(supabase, userId, formData);
+  const photo = await saveImageChoice(supabase, {
+    ...LOG_PHOTO_UPLOAD,
+    ownerId: userId,
+    formData,
+  });
   if (photo.error) return { errors: { photo: photo.error } };
 
   const { data, error } = await supabase
@@ -84,12 +62,12 @@ export async function createLog(
     .insert({
       author_id: userId,
       ...logColumns(input, shopId),
-      photo_path: photo.photoPath ?? null,
+      photo_path: photo.path ?? null,
     })
     .select("id")
     .single();
   if (error || !data) {
-    await removeImages(supabase, LOG_PHOTOS_BUCKET, [photo.photoPath]);
+    await removeImages(supabase, LOG_PHOTOS_BUCKET, [photo.path]);
     return { errors: { form: "We couldn't save your Log. Try again." } };
   }
 
@@ -113,7 +91,7 @@ export async function updateLog(
   const supabase = await createClient();
   const userId = await signedInUser(supabase, `/logs/${id}/edit`);
 
-  const shopId = await upsertShop(supabase, input.shop);
+  const shopId = await findOrAddShop(input.shop.placeId);
   if (!shopId) {
     return { errors: { form: "We couldn't save that shop. Try again." } };
   }
@@ -129,20 +107,24 @@ export async function updateLog(
     return { errors: { form: "We couldn't save your changes. Try again." } };
   }
 
-  const photo = await savePhoto(supabase, userId, formData);
+  const photo = await saveImageChoice(supabase, {
+    ...LOG_PHOTO_UPLOAD,
+    ownerId: userId,
+    formData,
+  });
   if (photo.error) return { errors: { photo: photo.error } };
-  const photoChanged = photo.photoPath !== undefined;
+  const photoChanged = photo.path !== undefined;
 
   const { data, error } = await supabase
     .from("logs")
     .update({
       ...logColumns(input, shopId),
-      ...(photoChanged ? { photo_path: photo.photoPath } : {}),
+      ...(photoChanged ? { photo_path: photo.path } : {}),
     })
     .eq("id", id)
     .select("id");
   if (error || !data || data.length === 0) {
-    await removeImages(supabase, LOG_PHOTOS_BUCKET, [photo.photoPath]);
+    await removeImages(supabase, LOG_PHOTOS_BUCKET, [photo.path]);
     return { errors: { form: "We couldn't save your changes. Try again." } };
   }
   if (photoChanged) {

@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { LogForm } from "@/components/logs/log-form";
+import { devToolsEnabled } from "@/lib/dev/dev-tools";
 import { getLogSuggestions } from "@/lib/logs/suggestions";
 
 export const metadata: Metadata = { title: "Log a drink · Boba Buds" };
@@ -21,5 +22,10 @@ export default function LogPage() {
 async function NewLogForm() {
   // Per-request: the Supabase session check reads the clock.
   await connection();
-  return <LogForm suggestions={await getLogSuggestions()} />;
+  return (
+    <LogForm
+      suggestions={await getLogSuggestions()}
+      builtInShops={devToolsEnabled()}
+    />
+  );
 }

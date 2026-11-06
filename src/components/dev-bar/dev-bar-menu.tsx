@@ -5,8 +5,9 @@ import { cn } from "@/lib/utils";
 
 /**
  * The Dev Bar's toggle and user list. A native <details> disclosure, so it
- * works before hydration. Each user is a plain link to the dev sign-in route:
- * choosing one does a full navigation and the whole app reloads as that user.
+ * works before hydration. Each user is a plain link to the dev sign-in route
+ * ("New user" is a POST form): choosing one does a full navigation and the
+ * whole app reloads as that user.
  */
 export function DevBarMenu({
   users,
@@ -68,15 +69,18 @@ export function DevBarMenu({
               </li>
             ))}
             <li className="mt-1 border-t border-taro-500/20 pt-1">
-              <a
-                href={`/auth/dev-sign-in?as=${NEW_DEV_USER}`}
-                className="flex flex-col rounded-xl px-2 py-1.5 hover:bg-accent"
-              >
-                <span className="font-semibold">New user</span>
-                <span className="text-xs text-muted-foreground">
-                  fresh account, starts at setup
-                </span>
-              </a>
+              {/* A POST, so prefetching or crawling can't create accounts. */}
+              <form method="post" action={`/auth/dev-sign-in?as=${NEW_DEV_USER}`}>
+                <button
+                  type="submit"
+                  className="flex w-full flex-col rounded-xl px-2 py-1.5 text-left hover:bg-accent"
+                >
+                  <span className="font-semibold">New user</span>
+                  <span className="text-xs text-muted-foreground">
+                    fresh account, starts at setup
+                  </span>
+                </button>
+              </form>
             </li>
           </ul>
         </nav>

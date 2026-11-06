@@ -4,8 +4,10 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { LogForm } from "@/components/logs/log-form";
-import { getLog, getViewerId } from "@/lib/logs/queries";
+import { devToolsEnabled } from "@/lib/dev/dev-tools";
+import { getLog } from "@/lib/logs/queries";
 import { getLogSuggestions } from "@/lib/logs/suggestions";
+import { createClient, getViewerId } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Edit Log · Boba Buds" };
 
@@ -30,10 +32,12 @@ async function EditLogForm({
   await connection();
   const [log, viewerId, suggestions] = await Promise.all([
     getLog(id),
-    getViewerId(),
+    createClient().then(getViewerId),
     getLogSuggestions(),
   ]);
   // Only the author edits; to anyone else this page doesn't exist.
   if (!log || log.authorId !== viewerId) notFound();
-  return <LogForm log={log} suggestions={suggestions} />;
+  return (
+    <LogForm log={log} suggestions={suggestions} builtInShops={devToolsEnabled()} />
+  );
 }

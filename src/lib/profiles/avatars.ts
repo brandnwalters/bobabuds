@@ -15,3 +15,10 @@ export const AVATAR_PICKER_LABELS = {
 
 /** The form field the avatar picker's choice travels in. */
 export const AVATAR_FIELD = "avatar";
+
+/** How avatar uploads are saved (see `saveImageChoice`). */
+export const AVATAR_UPLOAD = {
+  bucket: AVATARS_BUCKET,
+  field: AVATAR_FIELD,
+  uploadError: "We couldn't upload your avatar. Try again.",
+};
