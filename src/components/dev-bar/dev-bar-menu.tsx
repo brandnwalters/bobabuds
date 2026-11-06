@@ -1,6 +1,6 @@
 import { Wrench } from "lucide-react";
 
-import type { SeededUser } from "@/lib/dev/seed-users";
+import { NEW_DEV_USER, type SeededUser } from "@/lib/dev/seed-users";
 import { cn } from "@/lib/utils";
 
 /**
@@ -67,6 +67,17 @@ export function DevBarMenu({
                 </a>
               </li>
             ))}
+            <li className="mt-1 border-t border-taro-500/20 pt-1">
+              <a
+                href={`/auth/dev-sign-in?as=${NEW_DEV_USER}`}
+                className="flex flex-col rounded-xl px-2 py-1.5 hover:bg-accent"
+              >
+                <span className="font-semibold">New user</span>
+                <span className="text-xs text-muted-foreground">
+                  fresh account, starts at setup
+                </span>
+              </a>
+            </li>
           </ul>
         </nav>
       </details>

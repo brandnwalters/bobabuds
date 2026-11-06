@@ -51,6 +51,18 @@ export function seededEmail(username: SeededUsername) {
   return `${username}@seed.bobabuds.test`;
 }
 
+/**
+ * `?as=new` on the dev sign-in route (the Dev Bar's "New user" entry) creates
+ * a fresh account flagged as seeded but with no profile, so it lands on
+ * onboarding. Lets the setup step be checked on a preview, with no email.
+ */
+export const NEW_DEV_USER = "new";
+
+/** A unique email for a fresh dev account. */
+export function newDevUserEmail() {
+  return `new-${crypto.randomUUID()}@seed.bobabuds.test`;
+}
+
 /** The seeded user with this username, or undefined for anyone else. */
 export function findSeededUser(username: unknown): SeededUser | undefined {
   return SEEDED_USERS.find((user) => user.username === username);

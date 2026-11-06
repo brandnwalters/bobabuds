@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { removeImages } from "@/lib/images/storage";
@@ -95,5 +96,7 @@ export async function createProfile(
     };
   }
 
+  // The root layout (Dev Bar) still shows "no profile" until it re-renders.
+  revalidatePath("/", "layout");
   redirect("/");
 }
