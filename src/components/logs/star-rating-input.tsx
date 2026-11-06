@@ -19,11 +19,13 @@ export function StarRatingInput({
   onChange,
   invalid,
   describedBy,
+  labelledBy,
 }: {
   value: number | null;
   onChange: (value: number) => void;
   invalid?: boolean;
   describedBy?: string;
+  labelledBy: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const shown = hover ?? value ?? 0;
@@ -31,7 +33,7 @@ export function StarRatingInput({
   return (
     <div
       role="radiogroup"
-      aria-labelledby="rating-legend"
+      aria-labelledby={labelledBy}
       aria-invalid={invalid || undefined}
       aria-describedby={describedBy}
       className="flex items-center gap-3"
