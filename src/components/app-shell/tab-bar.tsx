@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CirclePlus, Home, User, Users } from "lucide-react";
+import { Suspense } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -23,8 +24,26 @@ function isActive(pathname: string, href: string) {
  * tab (the pending-request count, streamed in from the server).
  */
 export function TabBar({ friendsBadge }: { friendsBadge?: React.ReactNode }) {
-  const pathname = usePathname();
+  // usePathname is URL data: on dynamic routes (e.g. /logs/[id]) it must sit
+  // inside Suspense. The fallback is the same bar with no tab marked current.
+  return (
+    <Suspense fallback={<Tabs pathname={null} friendsBadge={friendsBadge} />}>
+      <TabsAtCurrentPath friendsBadge={friendsBadge} />
+    </Suspense>
+  );
+}
 
+function TabsAtCurrentPath({ friendsBadge }: { friendsBadge?: React.ReactNode }) {
+  return <Tabs pathname={usePathname()} friendsBadge={friendsBadge} />;
+}
+
+function Tabs({
+  pathname,
+  friendsBadge,
+}: {
+  pathname: string | null;
+  friendsBadge?: React.ReactNode;
+}) {
   return (
     <nav
       aria-label="Main"
@@ -35,7 +54,7 @@ export function TabBar({ friendsBadge }: { friendsBadge?: React.ReactNode }) {
     >
       <ul className="mx-auto grid max-w-xl grid-cols-4 md:flex md:gap-1">
         {tabs.map(({ href, label, icon: Icon, ...tab }) => {
-          const active = isActive(pathname, href);
+          const active = pathname !== null && isActive(pathname, href);
           const prominent = "prominent" in tab && tab.prominent;
           return (
             <li key={href}>
