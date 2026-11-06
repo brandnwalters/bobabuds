@@ -1,6 +1,7 @@
 import { MapPin } from "lucide-react";
 import Link from "next/link";
 
+import { CheersButton } from "@/components/cheers/cheers-button";
 import { TimeAgo } from "@/components/feed/time-ago";
 import { LogPhoto } from "@/components/logs/log-photo";
 import { Stars } from "@/components/logs/stars";
@@ -82,6 +83,12 @@ export function FeedCard({ log }: { log: FeedLog }) {
       {log.note && (
         <p className="rounded-xl bg-milk-tea-100 p-3 whitespace-pre-wrap">{log.note}</p>
       )}
+
+      <CheersButton
+        logId={log.id}
+        count={log.cheers.count}
+        viewerCheered={log.cheers.viewerCheered}
+      />
     </article>
   );
 }

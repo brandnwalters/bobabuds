@@ -20,6 +20,7 @@ import {
   type SeededUsername,
 } from "../src/lib/dev/seed-users.ts";
 import { SEEDED_LOGS } from "../src/lib/dev/seed-logs.ts";
+import { SEEDED_CHEERS } from "../src/lib/dev/seed-cheers.ts";
 import { DEV_FALLBACK_SHOPS } from "../src/lib/places/fallback.ts";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -169,3 +170,34 @@ if (logsError) throw logsError;
 console.log(
   `Seeded ${shops.length} shops and ${SEEDED_LOGS.length} logs (${photoPaths.filter(Boolean).length} with photos)`,
 );
+
+// Cheers ---------------------------------------------------------------------
+// Only on Logs the cheerer could see: their friend's (checked here, since the
+// service-role client bypasses the access rules).
+
+const { data: seededLogRows, error: seededLogsError } = await admin
+  .from("logs")
+  .select("id, author_id, drink_name");
+if (seededLogsError) throw seededLogsError;
+const logIdByAuthorAndDrink = new Map(
+  seededLogRows.map((log) => [`${log.author_id}|${log.drink_name}`, log.id]),
+);
+const areSeededFriends = (a: SeededUsername, b: SeededUsername) =>
+  SEEDED_FRIENDSHIPS.some(
+    ([x, y]) => (x === a && y === b) || (x === b && y === a),
+  );
+
+const cheers = SEEDED_CHEERS.flatMap(({ author, drink, by }) => {
+  const logId = logIdByAuthorAndDrink.get(`${idOf(author)}|${drink}`);
+  if (!logId) throw new Error(`Seeded Cheers on unknown Log "${drink}" by @${author}`);
+  return by.map((cheerer) => {
+    if (!areSeededFriends(author, cheerer)) {
+      throw new Error(`@${cheerer} can't see @${author}'s Logs to cheer "${drink}"`);
+    }
+    return { log_id: logId, user_id: idOf(cheerer) };
+  });
+});
+const { error: cheersError } = await admin.from("cheers").insert(cheers);
+if (cheersError) throw cheersError;
+
+console.log(`Seeded ${cheers.length} cheers`);
