@@ -6,7 +6,7 @@ import { removeImages, uploadImage } from "@/lib/images/storage";
 import { readImageChoice } from "@/lib/images/upload";
 import { type LogInput, parseLogForm, type LogErrors } from "@/lib/logs/fields";
 import { LOG_PHOTOS_BUCKET } from "@/lib/logs/photos";
-import { upsertShop } from "@/lib/shops/upsert";
+import { findOrAddShop } from "@/lib/shops/find-or-add";
 import { createClient } from "@/lib/supabase/server";
 
 export type LogFormState = { errors: LogErrors };
@@ -71,7 +71,7 @@ export async function createLog(
   const supabase = await createClient();
   const userId = await signedInUser(supabase, "/log");
 
-  const shopId = await upsertShop(supabase, input.shop);
+  const shopId = await findOrAddShop(input.shop.placeId);
   if (!shopId) {
     return { errors: { form: "We couldn't save that shop. Try again." } };
   }
@@ -113,7 +113,7 @@ export async function updateLog(
   const supabase = await createClient();
   const userId = await signedInUser(supabase, `/logs/${id}/edit`);
 
-  const shopId = await upsertShop(supabase, input.shop);
+  const shopId = await findOrAddShop(input.shop.placeId);
   if (!shopId) {
     return { errors: { form: "We couldn't save that shop. Try again." } };
   }

@@ -6,7 +6,8 @@ import { supabasePublicEnv } from "@/lib/supabase/env";
 
 /**
  * Service-role client that bypasses row-level security. Only the dev-only
- * Dev Bar sign-in route may use it; app code acts as the signed-in user.
+ * Dev Bar sign-in route and adding shops (`findOrAddShop`, from details the
+ * server looked up) may use it; other app code acts as the signed-in user.
  */
 export function createAdminClient() {
   const { url } = supabasePublicEnv();

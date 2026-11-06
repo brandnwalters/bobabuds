@@ -2,35 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import { createShop, newShop } from "./support/buds";
 import { anonClient, signInAsSeeded } from "./support/supabase";
-
-type Client = ReturnType<typeof anonClient>;
-
-/** A shop with a unique place ID, so tests don't depend on each other. */
-function newShop() {
-  const placeId = `test-${randomUUID()}`;
-  return {
-    place_id: placeId,
-    name: "Test Tea House",
-    formatted_address: "123 Franklin St, Chapel Hill, NC 27516, USA",
-    latitude: 35.9132,
-    longitude: -79.0558,
-    google_maps_url: `https://www.google.com/maps/place/?q=place_id:${placeId}`,
-  };
-}
-
-async function createShop(client: Client) {
-  const shop = newShop();
-  const { error } = await client.from("shops").insert(shop);
-  if (error) throw error;
-  const { data, error: readError } = await client
-    .from("shops")
-    .select("id")
-    .eq("place_id", shop.place_id)
-    .single();
-  if (readError) throw readError;
-  return data.id as string;
-}
 
 function newLog(shopId: string) {
   return {
@@ -42,48 +15,49 @@ function newLog(shopId: string) {
 }
 
 describe("shops", () => {
-  it("any signed-in user can add a shop and read shops others added", async () => {
+  it("signed-in users can read shops but not add them (only the server does)", async () => {
     const mia = await signInAsSeeded("mia");
-    const casey = await signInAsSeeded("casey");
     const shop = newShop();
 
     const { error } = await mia.client.from("shops").insert(shop);
-    expect(error).toBeNull();
+    expect(error?.code).toBe("42501");
 
-    const { data } = await casey.client
+    const shopId = await createShop();
+    const { data } = await mia.client
       .from("shops")
-      .select(
-        "place_id, name, formatted_address, latitude, longitude, google_maps_url",
-      )
-      .eq("place_id", shop.place_id)
+      .select("id")
+      .eq("id", shopId)
       .single();
-    expect(data).toEqual(shop);
+    expect(data).toEqual({ id: shopId });
   });
 
-  it("a place ID is stored once, and others can't overwrite it", async () => {
+  it("users can't add a shop by upserting either", async () => {
     const mia = await signInAsSeeded("mia");
-    const casey = await signInAsSeeded("casey");
-    const shop = newShop();
-    await mia.client.from("shops").insert(shop);
 
-    const { error: duplicate } = await casey.client
+    const { error } = await mia.client
       .from("shops")
-      .insert({ ...shop, name: "Fake Name" });
-    expect(duplicate?.code).toBe("23505");
+      .upsert(newShop(), { onConflict: "place_id", ignoreDuplicates: true });
+
+    expect(error?.code).toBe("42501");
+  });
+
+  it("users can't change a shop", async () => {
+    const casey = await signInAsSeeded("casey");
+    const shopId = await createShop();
 
     const { data: changed } = await casey.client
       .from("shops")
       .update({ name: "Fake Name" })
-      .eq("place_id", shop.place_id)
+      .eq("id", shopId)
       .select();
     expect(changed ?? []).toEqual([]);
 
-    const { data } = await mia.client
+    const { data } = await casey.client
       .from("shops")
       .select("name")
-      .eq("place_id", shop.place_id)
+      .eq("id", shopId)
       .single();
-    expect(data).toEqual({ name: shop.name });
+    expect(data).toEqual({ name: "Test Tea House" });
   });
 
   it("signed-out visitors can't read shops", async () => {
@@ -92,10 +66,11 @@ describe("shops", () => {
   });
 });
 
+
 describe("logs", () => {
   it("the author can create a Log and read it back", async () => {
     const mia = await signInAsSeeded("mia");
-    const shopId = await createShop(mia.client);
+    const shopId = await createShop();
     const log = newLog(shopId);
 
     const { data: created, error } = await mia.client
@@ -131,7 +106,7 @@ describe("logs", () => {
   it("another user can't read the author's Logs", async () => {
     const mia = await signInAsSeeded("mia");
     const casey = await signInAsSeeded("casey");
-    const shopId = await createShop(mia.client);
+    const shopId = await createShop();
     const { data: created } = await mia.client
       .from("logs")
       .insert(newLog(shopId))
@@ -154,7 +129,7 @@ describe("logs", () => {
   it("another user can't create a Log as the author", async () => {
     const mia = await signInAsSeeded("mia");
     const casey = await signInAsSeeded("casey");
-    const shopId = await createShop(casey.client);
+    const shopId = await createShop();
     const log = newLog(shopId);
 
     const { error } = await casey.client
@@ -171,7 +146,7 @@ describe("logs", () => {
 
   it("the author can update and delete their own Log", async () => {
     const mia = await signInAsSeeded("mia");
-    const shopId = await createShop(mia.client);
+    const shopId = await createShop();
     const { data: created } = await mia.client
       .from("logs")
       .insert(newLog(shopId))
@@ -199,7 +174,7 @@ describe("logs", () => {
   it("another user can't update or delete the author's Log", async () => {
     const mia = await signInAsSeeded("mia");
     const casey = await signInAsSeeded("casey");
-    const shopId = await createShop(mia.client);
+    const shopId = await createShop();
     const log = newLog(shopId);
     const { data: created } = await mia.client
       .from("logs")
@@ -232,7 +207,7 @@ describe("logs", () => {
   it("the author can't hand their Log to someone else", async () => {
     const mia = await signInAsSeeded("mia");
     const casey = await signInAsSeeded("casey");
-    const shopId = await createShop(mia.client);
+    const shopId = await createShop();
     const { data: created } = await mia.client
       .from("logs")
       .insert(newLog(shopId))
@@ -255,7 +230,7 @@ describe("logs", () => {
 
   it("rejects ratings outside 0.5 to 5 in half steps, and bad options", async () => {
     const mia = await signInAsSeeded("mia");
-    const shopId = await createShop(mia.client);
+    const shopId = await createShop();
 
     const bad = [
       { rating: 0 },
