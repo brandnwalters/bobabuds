@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CirclePlus, Home, User, Users } from "lucide-react";
+import { Suspense } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -22,8 +23,20 @@ function isActive(pathname: string, href: string) {
  * the header on desktop (md and up).
  */
 export function TabBar() {
-  const pathname = usePathname();
+  // usePathname is URL data: on dynamic routes (e.g. /logs/[id]) it must sit
+  // inside Suspense. The fallback is the same bar with no tab marked current.
+  return (
+    <Suspense fallback={<Tabs pathname={null} />}>
+      <TabsAtCurrentPath />
+    </Suspense>
+  );
+}
 
+function TabsAtCurrentPath() {
+  return <Tabs pathname={usePathname()} />;
+}
+
+function Tabs({ pathname }: { pathname: string | null }) {
   return (
     <nav
       aria-label="Main"
@@ -34,7 +47,7 @@ export function TabBar() {
     >
       <ul className="mx-auto grid max-w-xl grid-cols-4 md:flex md:gap-1">
         {tabs.map(({ href, label, icon: Icon, ...tab }) => {
-          const active = isActive(pathname, href);
+          const active = pathname !== null && isActive(pathname, href);
           const prominent = "prominent" in tab && tab.prominent;
           return (
             <li key={href}>

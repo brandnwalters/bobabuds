@@ -59,6 +59,31 @@ project that holds only seed data (set `NEXT_PUBLIC_SUPABASE_URL` and
 `SUPABASE_SECRET_KEY` to that project's values). Never point it at production:
 it wipes the database.
 
+## Google Places key
+
+The Log form searches for shops with Google Places Autocomplete in the
+browser, using `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`. Without a key, it searches a
+built-in list of real Chapel Hill/Durham shops (`src/lib/places/fallback.ts`)
+instead. The browser tests rely on that list, so run them without a key. Shops
+from the list get `dev-fallback:` place IDs, not real Google ones.
+
+To use real autocomplete:
+
+1. In Google Cloud, enable the **Maps JavaScript API** and **Places API (New)**,
+   then create an API key.
+2. **Restrict the key**, because it is visible to anyone using the app:
+   - Application restriction: **Websites (HTTP referrers)**, limited to the
+     app's domains (the production domain, `https://*-<team>.vercel.app/*` for
+     previews, and `http://localhost:3000/*` / `http://127.0.0.1:3000/*` for
+     local dev).
+   - API restriction: only the Maps JavaScript API and Places API (New).
+3. Set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in `.env.local` and in Vercel
+   (Production and Preview). It's read at build time, so redeploy after you
+   change it.
+
+At MVP scale, usage should stay within Google's free tier. One search plus the
+place-details call when a shop is picked is billed as one autocomplete session.
+
 ## Database migrations
 
 Migrations live in `supabase/migrations/` and are applied in order by
@@ -98,3 +123,5 @@ These steps need the project owner's accounts:
    - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and
      `SUPABASE_SECRET_KEY`: Production and Preview.
    - `DEV_TOOLS=true`: **Preview only**, never Production.
+   - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`: Production and Preview (see
+     [Google Places key](#google-places-key)).
