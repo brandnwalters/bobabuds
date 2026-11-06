@@ -8,11 +8,30 @@
 # Secrets
 .env
 .env.*
+!.env.example
 
 # Dependencies and build output
 node_modules/
 dist/
 build/
+/.next/
+/out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Vercel
+.vercel
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
 
 # Logs
 *.log
+*.pem
