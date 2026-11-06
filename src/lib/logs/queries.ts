@@ -104,3 +104,89 @@ export async function listMyLogs(): Promise<LogWithShop[]> {
   if (error) throw error;
   return data.map(toLog);
 }
+
+// Feed -----------------------------------------------------------------------
+
+/** A Log in the Feed: the Log, its shop and its author. */
+export type FeedLog = LogWithShop & {
+  author: {
+    id: string;
+    username: string;
+    displayName: string;
+    avatarPath: string | null;
+  };
+};
+
+export type FeedPage = {
+  logs: FeedLog[];
+  /** Pass to `listFeed` for the next (older) page; null on the last page. */
+  nextCursor: string | null;
+};
+
+export const FEED_PAGE_SIZE = 10;
+
+const FEED_COLUMNS = `${LOG_COLUMNS}, author:profiles!logs_author_id_fkey!inner(id, username, display_name, avatar_path)`;
+
+type FeedRow = LogRow & {
+  author: {
+    id: string;
+    username: string;
+    display_name: string;
+    avatar_path: string | null;
+  };
+};
+
+// Cursor = "<created_at>|<id>" of the last Log on the previous page. It comes
+// back from the browser, so it is parsed strictly before it reaches a filter.
+const CURSOR =
+  /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2}))\|([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+function encodeCursor(row: { created_at: string; id: string }) {
+  return `${row.created_at}|${row.id}`;
+}
+
+/**
+ * One page of the signed-in user's Feed: Logs they can view (their own and
+ * their friends', enforced by row-level security), newest created first, with
+ * id as the tie-breaker. `cursor` comes from the previous page's `nextCursor`.
+ */
+export async function listFeed(
+  cursor?: string | null,
+  pageSize = FEED_PAGE_SIZE,
+): Promise<FeedPage> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("logs")
+    .select(FEED_COLUMNS)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    // One extra row tells us whether there is another page.
+    .limit(pageSize + 1);
+
+  if (cursor) {
+    const match = CURSOR.exec(cursor);
+    if (!match) throw new Error("Invalid feed cursor");
+    const [, createdAt, id] = match;
+    query = query.or(
+      `created_at.lt."${createdAt}",and(created_at.eq."${createdAt}",id.lt.${id})`,
+    );
+  }
+
+  const { data, error } = await query.returns<FeedRow[]>();
+  if (error) throw error;
+
+  const rows = data.slice(0, pageSize);
+  return {
+    logs: rows.map((row) => ({
+      ...toLog(row),
+      author: {
+        id: row.author.id,
+        username: row.author.username,
+        displayName: row.author.display_name,
+        avatarPath: row.author.avatar_path,
+      },
+    })),
+    nextCursor:
+      data.length > pageSize ? encodeCursor(rows[rows.length - 1]!) : null,
+  };
+}
