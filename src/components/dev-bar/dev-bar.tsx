@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { DevBarMenu } from "@/components/dev-bar/dev-bar-menu";
 import { devToolsEnabled } from "@/lib/dev/dev-tools";
 import { SEEDED_USERS } from "@/lib/dev/seed-users";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getViewerId } from "@/lib/supabase/server";
 
 /**
  * Floating dev-only user switcher. Renders nothing unless `DEV_TOOLS=true`.
@@ -26,7 +26,7 @@ async function DevBarWithCurrentUser() {
   if (!devToolsEnabled()) return null;
 
   const supabase = await createClient();
-  const userId = (await supabase.auth.getClaims()).data?.claims.sub;
+  const userId = await getViewerId(supabase);
   let current: { username: string } | "no profile" | null = null;
   if (userId) {
     const { data } = await supabase

@@ -1,18 +1,17 @@
 import "server-only";
 
 import { type FeedLog, listShopLogs } from "@/lib/logs/queries";
-import type { ShopDetails } from "@/lib/places/types";
+import { type Shop, SHOP_COLUMNS, type ShopRow, toShop } from "@/lib/shops/columns";
 import { createClient } from "@/lib/supabase/server";
+import { UUID } from "@/lib/uuid";
 
 export type ShopPage = {
-  shop: ShopDetails & { id: string };
+  shop: Shop;
   /** Logs at the shop the viewer can see, newest first. */
   logs: FeedLog[];
   /** Mean rating over `logs`, or null when there are none. */
   averageRating: number | null;
 };
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * A shop with the Logs at it the signed-in user can view and their average
@@ -25,24 +24,16 @@ export async function getShopPage(id: string): Promise<ShopPage | null> {
   const [{ data: shop, error }, logs] = await Promise.all([
     supabase
       .from("shops")
-      .select("id, place_id, name, formatted_address, latitude, longitude, google_maps_url")
+      .select(SHOP_COLUMNS)
       .eq("id", id)
-      .maybeSingle(),
+      .maybeSingle<ShopRow>(),
     listShopLogs(id),
   ]);
   if (error) throw error;
   if (!shop) return null;
 
   return {
-    shop: {
-      id: shop.id,
-      placeId: shop.place_id,
-      name: shop.name,
-      formattedAddress: shop.formatted_address,
-      latitude: shop.latitude,
-      longitude: shop.longitude,
-      googleMapsUrl: shop.google_maps_url,
-    },
+    shop: toShop(shop),
     logs,
     averageRating:
       logs.length > 0

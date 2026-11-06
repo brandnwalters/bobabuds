@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getViewerId } from "@/lib/supabase/server";
 
 // Mutations run as the signed-in user, so the database's access rules decide
 // what's allowed. Errors that just mean "the state already changed" (someone
@@ -49,7 +49,7 @@ export async function cancelFriendRequest(recipientId: string) {
 
 async function deleteRequest(otherId: string, me: "sender" | "recipient") {
   const supabase = await createClient();
-  const userId = (await supabase.auth.getClaims()).data?.claims.sub;
+  const userId = await getViewerId(supabase);
   if (!userId) throw new Error("Not signed in");
 
   const [senderId, recipientId] =
@@ -65,7 +65,7 @@ async function deleteRequest(otherId: string, me: "sender" | "recipient") {
 /** Ends the signed-in user's Friendship with `friendId`. */
 export async function unfriend(friendId: string) {
   const supabase = await createClient();
-  const userId = (await supabase.auth.getClaims()).data?.claims.sub;
+  const userId = await getViewerId(supabase);
   if (!userId) throw new Error("Not signed in");
 
   const [userA, userB] = [userId, friendId].sort();

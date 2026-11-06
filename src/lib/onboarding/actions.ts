@@ -3,14 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { removeImages } from "@/lib/images/storage";
-import { saveAvatar } from "@/lib/profiles/avatar-upload";
-import { AVATARS_BUCKET } from "@/lib/profiles/avatars";
+import { removeImages, saveImageChoice } from "@/lib/images/storage";
+import { AVATAR_UPLOAD, AVATARS_BUCKET } from "@/lib/profiles/avatars";
 import {
   displayNameProblem,
   usernameProblem,
 } from "@/lib/profiles/validation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getViewerId } from "@/lib/supabase/server";
 
 export type UsernameCheck =
   | { status: "invalid"; message: string }
@@ -63,21 +62,24 @@ export async function createProfile(
   }
 
   const supabase = await createClient();
-  const { data: claims } = await supabase.auth.getClaims();
-  const userId = claims?.claims.sub;
+  const userId = await getViewerId(supabase);
   if (!userId) redirect("/sign-in");
 
-  const avatar = await saveAvatar(supabase, userId, formData);
+  const avatar = await saveImageChoice(supabase, {
+    ...AVATAR_UPLOAD,
+    ownerId: userId,
+    formData,
+  });
   if (avatar.error) return { ...state, errors: { avatar: avatar.error } };
 
   const { error } = await supabase.from("profiles").insert({
     id: userId,
     username,
     display_name: displayName,
-    avatar_path: avatar.avatarPath ?? null,
+    avatar_path: avatar.path ?? null,
   });
   // The upload is orphaned if the profile wasn't created.
-  if (error) await removeImages(supabase, AVATARS_BUCKET, [avatar.avatarPath]);
+  if (error) await removeImages(supabase, AVATARS_BUCKET, [avatar.path]);
 
   if (error?.code === "23505") {
     // Unique violation: either the username went or the profile already exists.

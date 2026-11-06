@@ -3,11 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { removeImages } from "@/lib/images/storage";
-import { saveAvatar } from "@/lib/profiles/avatar-upload";
-import { AVATARS_BUCKET } from "@/lib/profiles/avatars";
+import { removeImages, saveImageChoice } from "@/lib/images/storage";
+import { AVATAR_UPLOAD, AVATARS_BUCKET } from "@/lib/profiles/avatars";
 import { displayNameProblem } from "@/lib/profiles/validation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getViewerId } from "@/lib/supabase/server";
 
 export type EditProfileState = {
   displayName: string;
@@ -28,7 +27,7 @@ export async function updateProfile(
   if (problem) return { ...state, errors: { displayName: problem } };
 
   const supabase = await createClient();
-  const userId = (await supabase.auth.getClaims()).data?.claims.sub;
+  const userId = await getViewerId(supabase);
   if (!userId) redirect("/sign-in?next=/profile/edit");
 
   const { data: current, error: readError } = await supabase
@@ -40,20 +39,24 @@ export async function updateProfile(
     return { ...state, errors: { form: "We couldn't save your profile. Try again." } };
   }
 
-  const avatar = await saveAvatar(supabase, userId, formData);
+  const avatar = await saveImageChoice(supabase, {
+    ...AVATAR_UPLOAD,
+    ownerId: userId,
+    formData,
+  });
   if (avatar.error) return { ...state, errors: { avatar: avatar.error } };
-  const avatarChanged = avatar.avatarPath !== undefined;
+  const avatarChanged = avatar.path !== undefined;
 
   const { data: updated, error } = await supabase
     .from("profiles")
     .update({
       display_name: displayName,
-      ...(avatarChanged ? { avatar_path: avatar.avatarPath } : {}),
+      ...(avatarChanged ? { avatar_path: avatar.path } : {}),
     })
     .eq("id", userId)
     .select("id");
   if (error || updated.length === 0) {
-    await removeImages(supabase, AVATARS_BUCKET, [avatar.avatarPath]);
+    await removeImages(supabase, AVATARS_BUCKET, [avatar.path]);
     return { ...state, errors: { form: "We couldn't save your profile. Try again." } };
   }
   if (avatarChanged) {

@@ -23,7 +23,7 @@ import {
   type IceLevel,
   type LogField,
 } from "@/lib/logs/fields";
-import { PHOTO_MAX_EDGE } from "@/lib/logs/photos";
+import { LOG_PHOTO_FIELD, PHOTO_MAX_EDGE } from "@/lib/logs/photos";
 import type { LogWithPhoto } from "@/lib/logs/queries";
 import type { LogSuggestions } from "@/lib/logs/suggestions";
 import type { ShopDetails } from "@/lib/places/types";
@@ -113,7 +113,7 @@ export function LogForm({
     <form
       // The photo lives in state (React resets file inputs after an action).
       action={(formData) => {
-        setImageChoice(formData, "photo", photo);
+        setImageChoice(formData, LOG_PHOTO_FIELD, photo);
         formAction(formData);
       }}
       className="space-y-6"

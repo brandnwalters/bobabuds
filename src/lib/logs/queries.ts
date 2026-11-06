@@ -6,12 +6,18 @@ import {
   type CheersRow,
   type CheersSummary,
 } from "@/lib/cheers/summary";
-import { signedImageUrls } from "@/lib/images/storage";
+import { signedImageUrls, signedUrlFor } from "@/lib/images/storage";
 import type { IceLevel } from "@/lib/logs/fields";
 import { LOG_PHOTOS_BUCKET } from "@/lib/logs/photos";
-import type { ShopDetails } from "@/lib/places/types";
-import { signedAvatarUrls } from "@/lib/profiles/avatar-urls";
-import { createClient } from "@/lib/supabase/server";
+import { withAvatarUrls } from "@/lib/profiles/avatar-urls";
+import { BUD_COLUMNS, type Bud, type ProfileRow, toBud } from "@/lib/profiles/people";
+import { type Shop, SHOP_COLUMNS, type ShopRow, toShop } from "@/lib/shops/columns";
+import {
+  createClient,
+  getViewerId,
+  type ServerSupabase,
+} from "@/lib/supabase/server";
+import { UUID, UUID_PATTERN } from "@/lib/uuid";
 
 export type LogWithShop = {
   id: string;
@@ -26,14 +32,13 @@ export type LogWithShop = {
   createdAt: string;
   /** Storage path in the log-photos bucket (sign it to show it). */
   photoPath: string | null;
-  shop: ShopDetails & { id: string };
+  shop: Shop;
 };
 
 /** A Log with a short-lived signed URL for its photo (null without one). */
 export type LogWithPhoto = LogWithShop & { photoUrl: string | null };
 
-const LOG_COLUMNS =
-  "id, author_id, drink_name, rating, drank_on, sweetness, ice, toppings, note, created_at, photo_path, shop:shops!inner(id, place_id, name, formatted_address, latitude, longitude, google_maps_url)";
+const LOG_COLUMNS = `id, author_id, drink_name, rating, drank_on, sweetness, ice, toppings, note, created_at, photo_path, shop:shops!inner(${SHOP_COLUMNS})`;
 
 type LogRow = {
   id: string;
@@ -47,15 +52,7 @@ type LogRow = {
   note: string | null;
   created_at: string;
   photo_path: string | null;
-  shop: {
-    id: string;
-    place_id: string;
-    name: string;
-    formatted_address: string;
-    latitude: number;
-    longitude: number;
-    google_maps_url: string;
-  };
+  shop: ShopRow;
 };
 
 function toLog(row: LogRow): LogWithShop {
@@ -71,22 +68,12 @@ function toLog(row: LogRow): LogWithShop {
     note: row.note,
     createdAt: row.created_at,
     photoPath: row.photo_path,
-    shop: {
-      id: row.shop.id,
-      placeId: row.shop.place_id,
-      name: row.shop.name,
-      formattedAddress: row.shop.formatted_address,
-      latitude: row.shop.latitude,
-      longitude: row.shop.longitude,
-      googleMapsUrl: row.shop.google_maps_url,
-    },
+    shop: toShop(row.shop),
   };
 }
 
 /** A Log with its Cheers, as seen by the signed-in viewer. */
 export type WithCheers = { cheers: CheersSummary };
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A Log the signed-in user may see, or null (row-level security decides). */
 export async function getLog(
@@ -94,17 +81,16 @@ export async function getLog(
 ): Promise<(LogWithPhoto & WithCheers) | null> {
   if (!UUID.test(id)) return null;
   const supabase = await createClient();
-  const [{ data, error }, claims] = await Promise.all([
+  const [{ data, error }, viewerId] = await Promise.all([
     supabase
       .from("logs")
       .select(`${LOG_COLUMNS}, ${CHEERS_EMBED}`)
       .eq("id", id)
       .maybeSingle<LogRow & { cheers: CheersRow[] }>(),
-    supabase.auth.getClaims(),
+    getViewerId(supabase),
   ]);
   if (error) throw error;
   if (!data) return null;
-  const viewerId = claims.data?.claims.sub ?? null;
   const urls = await signedImageUrls(supabase, LOG_PHOTOS_BUCKET, [data.photo_path]);
   return {
     ...withPhotoUrl(toLog(data), urls),
@@ -116,13 +102,7 @@ function withPhotoUrl<T extends LogWithShop>(
   log: T,
   urls: Map<string, string>,
 ): T & { photoUrl: string | null } {
-  return { ...log, photoUrl: (log.photoPath && urls.get(log.photoPath)) || null };
-}
-
-/** The signed-in user's id, or null when signed out. */
-export async function getViewerId(): Promise<string | null> {
-  const supabase = await createClient();
-  return (await supabase.auth.getClaims()).data?.claims.sub ?? null;
+  return { ...log, photoUrl: signedUrlFor(urls, log.photoPath) };
 }
 
 /**
@@ -147,16 +127,7 @@ export async function listLogsBy(authorId: string): Promise<LogWithShop[]> {
 // Feed -----------------------------------------------------------------------
 
 /** A Log in the Feed: the Log, its shop, its author, photo URL and Cheers. */
-export type FeedLog = LogWithPhoto & WithCheers & {
-  author: {
-    id: string;
-    username: string;
-    displayName: string;
-    avatarPath: string | null;
-    /** Short-lived signed URL of the author's avatar (null without one). */
-    avatarUrl: string | null;
-  };
-};
+export type FeedLog = LogWithPhoto & WithCheers & { author: Bud };
 
 export type FeedPage = {
   logs: FeedLog[];
@@ -166,58 +137,44 @@ export type FeedPage = {
 
 export const FEED_PAGE_SIZE = 10;
 
-const FEED_COLUMNS = `${LOG_COLUMNS}, author:profiles!logs_author_id_fkey!inner(id, username, display_name, avatar_path), ${CHEERS_EMBED}`;
+const FEED_COLUMNS = `${LOG_COLUMNS}, author:profiles!logs_author_id_fkey!inner(${BUD_COLUMNS}), ${CHEERS_EMBED}`;
 
-type FeedRow = LogRow & {
-  author: {
-    id: string;
-    username: string;
-    display_name: string;
-    avatar_path: string | null;
-  };
-  cheers: CheersRow[];
-};
+type FeedRow = LogRow & { author: ProfileRow; cheers: CheersRow[] };
 
 /**
  * Maps FEED_COLUMNS rows, signing their photos and author avatars in one
- * request each; shared by the
- * Feed and the Shop Page. `viewerId` (the signed-in user) decides whether the
- * viewer has cheered.
+ * request each; shared by the Feed and the Shop Page. `viewerId` (the
+ * signed-in user) decides whether the viewer has cheered.
  */
 async function toFeedLogs(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ServerSupabase,
   rows: FeedRow[],
   viewerId: string | null,
 ): Promise<FeedLog[]> {
-  const [photoUrls, avatarUrls] = await Promise.all([
+  const [photoUrls, authors] = await Promise.all([
     signedImageUrls(
       supabase,
       LOG_PHOTOS_BUCKET,
       rows.map((row) => row.photo_path),
     ),
-    signedAvatarUrls(
+    withAvatarUrls(
       supabase,
-      rows.map((row) => row.author.avatar_path),
+      rows.map((row) => toBud(row.author)),
     ),
   ]);
-  return rows.map((row) => ({
+  return rows.map((row, i) => ({
     ...withPhotoUrl(toLog(row), photoUrls),
-    author: {
-      id: row.author.id,
-      username: row.author.username,
-      displayName: row.author.display_name,
-      avatarPath: row.author.avatar_path,
-      avatarUrl:
-        (row.author.avatar_path && avatarUrls.get(row.author.avatar_path)) || null,
-    },
+    author: authors[i]!,
     cheers: toCheers(row.cheers, viewerId),
   }));
 }
 
 // Cursor = "<created_at>|<id>" of the last Log on the previous page. It comes
 // back from the browser, so it is parsed strictly before it reaches a filter.
-const CURSOR =
-  /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2}))\|([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+const CURSOR = new RegExp(
+  `^(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2}))\\|(${UUID_PATTERN})$`,
+  "i",
+);
 
 function encodeCursor(row: { created_at: string; id: string }) {
   return `${row.created_at}|${row.id}`;
@@ -250,12 +207,11 @@ export async function listFeed(
     );
   }
 
-  const [{ data, error }, claims] = await Promise.all([
+  const [{ data, error }, viewerId] = await Promise.all([
     query.returns<FeedRow[]>(),
-    supabase.auth.getClaims(),
+    getViewerId(supabase),
   ]);
   if (error) throw error;
-  const viewerId = claims.data?.claims.sub ?? null;
 
   const rows = data.slice(0, pageSize);
   return {
@@ -275,7 +231,7 @@ export async function listFeed(
 export async function listShopLogs(shopId: string): Promise<FeedLog[]> {
   if (!UUID.test(shopId)) return [];
   const supabase = await createClient();
-  const [{ data, error }, claims] = await Promise.all([
+  const [{ data, error }, viewerId] = await Promise.all([
     supabase
       .from("logs")
       .select(FEED_COLUMNS)
@@ -283,9 +239,8 @@ export async function listShopLogs(shopId: string): Promise<FeedLog[]> {
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .returns<FeedRow[]>(),
-    supabase.auth.getClaims(),
+    getViewerId(supabase),
   ]);
   if (error) throw error;
-  const viewerId = claims.data?.claims.sub ?? null;
   return toFeedLogs(supabase, data, viewerId);
 }

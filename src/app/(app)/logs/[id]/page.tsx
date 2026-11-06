@@ -7,7 +7,8 @@ import { CheeredBy } from "@/components/cheers/cheered-by";
 import { CheersButton } from "@/components/cheers/cheers-button";
 import { LogDetails } from "@/components/logs/log-details";
 import { LogOwnerActions } from "@/components/logs/log-owner-actions";
-import { getLog, getViewerId } from "@/lib/logs/queries";
+import { getLog } from "@/lib/logs/queries";
+import { createClient, getViewerId } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Log · Boba Buds" };
 
@@ -23,7 +24,10 @@ async function LogById({ params }: { params: PageProps<"/logs/[id]">["params"] }
   const { id } = await params;
   // Per-request: the Supabase session check reads the clock.
   await connection();
-  const [log, viewerId] = await Promise.all([getLog(id), getViewerId()]);
+  const [log, viewerId] = await Promise.all([
+    getLog(id),
+    createClient().then(getViewerId),
+  ]);
   if (!log) notFound();
   return (
     <div className="space-y-4">

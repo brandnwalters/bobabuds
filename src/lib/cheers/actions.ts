@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getViewerId } from "@/lib/supabase/server";
 
 export type CheersState = { count: number; viewerCheered: boolean };
 
@@ -18,7 +18,7 @@ export async function setCheers(
   cheered: boolean,
 ): Promise<CheersState | null> {
   const supabase = await createClient();
-  const viewerId = (await supabase.auth.getClaims()).data?.claims.sub;
+  const viewerId = await getViewerId(supabase);
   if (!viewerId) return null;
 
   if (cheered) {
