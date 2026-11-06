@@ -17,6 +17,8 @@ import {
   seededEmail,
   type SeededUsername,
 } from "../src/lib/dev/seed-users.ts";
+import { SEEDED_LOGS } from "../src/lib/dev/seed-logs.ts";
+import { DEV_FALLBACK_SHOPS } from "../src/lib/places/fallback.ts";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const secretKey = process.env.SUPABASE_SECRET_KEY;
@@ -80,3 +82,50 @@ if (requestsError) throw requestsError;
 console.log(
   `Seeded ${SEEDED_FRIENDSHIPS.length} friendships and ${SEEDED_FRIEND_REQUESTS.length} friend requests`,
 );
+
+// Shops and Logs -------------------------------------------------------------
+// Shops come from the shop picker's fallback list, so tests that pick "Moge
+// Tee" log at the same row the seeded Logs use.
+
+const { data: shops, error: shopsError } = await admin
+  .from("shops")
+  .insert(
+    DEV_FALLBACK_SHOPS.map((shop) => ({
+      place_id: shop.placeId,
+      name: shop.name,
+      formatted_address: shop.formattedAddress,
+      latitude: shop.latitude,
+      longitude: shop.longitude,
+      google_maps_url: shop.googleMapsUrl,
+    })),
+  )
+  .select("id, name");
+if (shopsError) throw shopsError;
+const shopIdByName = new Map(shops.map((shop) => [shop.name, shop.id]));
+
+const HOUR = 60 * 60 * 1000;
+const seedTime = Date.now();
+const { error: logsError } = await admin.from("logs").insert(
+  SEEDED_LOGS.map((log, index) => {
+    const shopId = shopIdByName.get(log.shop);
+    if (!shopId) throw new Error(`Seeded Log at unknown shop "${log.shop}"`);
+    // A few hours apart within a day, so the Feed order is deterministic.
+    const created = new Date(seedTime - log.daysAgo * 24 * HOUR - (1 + (index % 8)) * HOUR);
+    return {
+      author_id: idOf(log.author),
+      shop_id: shopId,
+      drink_name: log.drink,
+      rating: log.rating,
+      drank_on: created.toISOString().slice(0, 10),
+      sweetness: log.sweetness ?? null,
+      ice: log.ice ?? null,
+      toppings: log.toppings ?? [],
+      note: log.note ?? null,
+      created_at: created.toISOString(),
+      updated_at: created.toISOString(),
+    };
+  }),
+);
+if (logsError) throw logsError;
+
+console.log(`Seeded ${shops.length} shops and ${SEEDED_LOGS.length} logs`);
