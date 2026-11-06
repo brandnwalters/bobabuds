@@ -8,7 +8,7 @@ Issues and specs are tracked in GitHub Issues on `brandnwalters/bobabuds` via th
 
 ### Triage labels
 
-Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+The five default triage labels. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
