@@ -11,6 +11,7 @@ import {
 
 import { signInAs } from "./support/dev-sign-in";
 import { pickShop } from "./support/shop-picker";
+import { trustVercelPreview } from "./support/vercel-preview";
 
 // The whole MVP core loop, end to end, as a brand-new user and their friend.
 // It only talks to the app (Dev Bar + seeded users), so it runs both locally
@@ -41,6 +42,7 @@ async function newPage(browser: Browser, testInfo: TestInfo) {
     isMobile,
     hasTouch,
   });
+  await trustVercelPreview(context);
   return context.newPage();
 }
 
@@ -65,6 +67,7 @@ test("core loop: setup, befriend, log with a photo, Feed, Cheers, edit, Profile,
   browser,
 }, testInfo) => {
   test.slow();
+  await trustVercelPreview(page.context());
   const suffix = randomUUID().replaceAll("-", "").slice(0, 8);
   const username = `loop_${suffix}`;
   const displayName = `Loop ${suffix}`;

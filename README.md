@@ -173,9 +173,12 @@ pnpm exec supabase migration new <name>
      data as it found it, apart from one new `loop_*` account per run.
    - **No** `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in the Preview environment, so
      the shop picker uses the built-in shop list the tests pick from.
-   - If Vercel Deployment Protection is on, set
-     `VERCEL_AUTOMATION_BYPASS_SECRET` to the project's "Protection Bypass
-     for Automation" secret when running the command.
+   - If Vercel Deployment Protection is on (the default), run it through the
+     linked Vercel CLI so the core loop gets your login's short-lived OIDC
+     token (sent only to the preview):
+     `E2E_BASE_URL=https://<preview>.vercel.app pnpm dlx vercel env run -- pnpm test:e2e core-loop`.
+     Other specs use `VERCEL_AUTOMATION_BYPASS_SECRET` (the project's
+     "Protection Bypass for Automation" secret) instead.
 
    Running the whole suite against a preview works the same way; tests that
    need the local Supabase stack skip themselves there.
