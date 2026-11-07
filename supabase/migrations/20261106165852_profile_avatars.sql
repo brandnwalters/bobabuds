@@ -6,8 +6,14 @@
 -- profile fields). The app shows them through short-lived signed URLs.
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('avatars', 'avatars', false, 2 * 1024 * 1024, array['image/jpeg', 'image/webp']);
+values ('avatars', 'avatars', false, 2 * 1024 * 1024, array['image/jpeg', 'image/webp'])
+-- Storage survives `supabase db reset --remote`, so these must be re-runnable.
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
 
+drop policy if exists "Avatars: owners upload into their own folder" on storage.objects;
 create policy "Avatars: owners upload into their own folder"
   on storage.objects for insert
   to authenticated
@@ -16,6 +22,7 @@ create policy "Avatars: owners upload into their own folder"
     and public.storage_object_owner(name) = (select auth.uid())
   );
 
+drop policy if exists "Avatars: owners replace their own" on storage.objects;
 create policy "Avatars: owners replace their own"
   on storage.objects for update
   to authenticated
@@ -28,6 +35,7 @@ create policy "Avatars: owners replace their own"
     and public.storage_object_owner(name) = (select auth.uid())
   );
 
+drop policy if exists "Avatars: owners delete their own" on storage.objects;
 create policy "Avatars: owners delete their own"
   on storage.objects for delete
   to authenticated
@@ -36,6 +44,7 @@ create policy "Avatars: owners delete their own"
     and public.storage_object_owner(name) = (select auth.uid())
   );
 
+drop policy if exists "Avatars: readable by any signed-in user" on storage.objects;
 create policy "Avatars: readable by any signed-in user"
   on storage.objects for select
   to authenticated

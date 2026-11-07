@@ -88,7 +88,7 @@ After `pnpm seed`, use the Dev Bar to switch between users and check that:
 - Edit and Delete appear only on your own Logs; Cheers only on Logs you can
   see.
 
-`pnpm seed --linked` passes `--linked` to `supabase db reset`, to seed a hosted
+`pnpm seed --remote --yes` passes `--remote --yes` to `supabase db reset`, to seed a hosted
 project that holds only seed data (set `NEXT_PUBLIC_SUPABASE_URL` and
 `SUPABASE_SECRET_KEY` to that project's values). Never point it at production:
 it wipes the database.
@@ -169,7 +169,7 @@ pnpm exec supabase migration new <name>
 
    The preview needs:
    - `DEV_TOOLS=true` and a Supabase project that holds **only seed data**,
-     seeded with `pnpm seed --linked` (see above). The test leaves the seed
+     seeded with `pnpm seed --remote --yes` (see above). The test leaves the seed
      data as it found it, apart from one new `loop_*` account per run.
    - **No** `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in the Preview environment, so
      the shop picker uses the built-in shop list the tests pick from.

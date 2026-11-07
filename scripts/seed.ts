@@ -1,7 +1,7 @@
 /**
  * `pnpm seed`: resets the local database (migrations + supabase/seed.sql) and
  * creates the seeded users with their profiles. Extra arguments go to
- * `supabase db reset` (e.g. `pnpm seed --linked` for the preview project; set
+ * `supabase db reset` (e.g. `pnpm seed --remote --yes` for the preview project; set
  * NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY to that project's values).
  *
  * Runs with plain Node (type stripping), so imports need `.ts` extensions.

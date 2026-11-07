@@ -23,8 +23,14 @@ $$;
 grant execute on function public.storage_object_owner(text) to authenticated;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('log-photos', 'log-photos', false, 2 * 1024 * 1024, array['image/jpeg', 'image/webp']);
+values ('log-photos', 'log-photos', false, 2 * 1024 * 1024, array['image/jpeg', 'image/webp'])
+-- Storage survives `supabase db reset --remote`, so these must be re-runnable.
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
 
+drop policy if exists "Log photos: authors upload into their own folder" on storage.objects;
 create policy "Log photos: authors upload into their own folder"
   on storage.objects for insert
   to authenticated
@@ -33,6 +39,7 @@ create policy "Log photos: authors upload into their own folder"
     and public.storage_object_owner(name) = (select auth.uid())
   );
 
+drop policy if exists "Log photos: authors replace their own" on storage.objects;
 create policy "Log photos: authors replace their own"
   on storage.objects for update
   to authenticated
@@ -45,6 +52,7 @@ create policy "Log photos: authors replace their own"
     and public.storage_object_owner(name) = (select auth.uid())
   );
 
+drop policy if exists "Log photos: authors delete their own" on storage.objects;
 create policy "Log photos: authors delete their own"
   on storage.objects for delete
   to authenticated
@@ -53,6 +61,7 @@ create policy "Log photos: authors delete their own"
     and public.storage_object_owner(name) = (select auth.uid())
   );
 
+drop policy if exists "Log photos: readable by whoever can view the author's Logs" on storage.objects;
 create policy "Log photos: readable by whoever can view the author's Logs"
   on storage.objects for select
   to authenticated
